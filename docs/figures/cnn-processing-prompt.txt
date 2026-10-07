@@ -1,0 +1,21 @@
+Generated with the built-in image generation tool.
+
+Create a high-resolution educational infographic image for a mentoring presentation, landscape, clean white background, navy text, blue and teal diagrams, readable large typography. Title: "FedConsent Health: How Our CNN Learns". Subtitle: "A small PyTorch CNN trained from scratch on public chest X-rays".
+Clearly separate two horizontal panels.
+
+TOP PANEL title "1. How an image becomes a prediction". Left-to-right connected illustrated stages with exact shape labels, using stylized feature-map stacks and a small schematic grayscale chest X-ray clearly marked "Illustration":
+"Chest X-ray" / "1 × 28 × 28" / "Pixel values scaled to 0–1";
+"Convolution + ReLU" / "4 filters, 3 × 3" / "4 × 28 × 28";
+"Average pooling" / "2 × 2" / "4 × 14 × 14";
+"Convolution + ReLU" / "8 filters, 3 × 3" / "8 × 14 × 14";
+"Average pooling" / "2 × 2" / "8 × 7 × 7";
+"Flatten + Linear" / "392 features → 2 scores";
+"Prediction" / "Softmax → pneumonia probability" / "Validation-selected threshold" / "Normal or pneumonia".
+Tiny note "Convolutions use padding 1. Shapes shown for one image." Do not invent numerical probabilities or feature heatmap meanings.
+
+BOTTOM PANEL title "2. How the model learns — training only". Flow "Consent-eligible training images + known labels" → "CNN forward pass" → "Cross-entropy loss: measure error" → "Backpropagation: calculate gradients" → "Update model weights". Arrow loops from update back to CNN with text "Repeat for training batches".
+Under update show two clearly labeled alternative paths converging into weight update: "No DP: ordinary SGD" and "DP enabled: Opacus DP-SGD", latter containing sequence "Per-record gradients → Clip each record's influence → Add Gaussian noise → SGD update", with small connected box "Privacy accountant: tracks ε and δ across rounds within a run". Ensure privacy applied during training, not after prediction. Make training panel spacious not cramped.
+Footer three short lines: "Same CNN at each simulated hospital; Flower FedAvg combines model parameters between rounds." "Consent controls eligibility. DP limits record-level information leakage under stated assumptions." "Educational prototype • Not clinically validated".
+Precise technical diagram, arrows unambiguous, no decorative filler, all text legible.
+
+Final corrections: remove the backward loop arrow and use the sentence 'After updating weights, repeat with the next training batch.' Show privacy accounting as a monitoring note: 'computes epsilon for chosen delta; accumulates steps across rounds within a run'. Remove arrows routing gradients through the accountant.

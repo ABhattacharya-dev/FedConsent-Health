@@ -18,7 +18,7 @@ Use Opacus DP-SGD with explicit adjacency, clipping norm, noise multiplier, samp
 Account for repeated rounds and released versions; resetting optimizer/model objects must not erase privacy history. Consent cohort changes need a defensible accounting policy before numerical claims. An epsilon target is an experimental configuration, not a medical safety threshold. Report achieved epsilon and delta with utility; mark failures/unavailable values honestly. Baseline without DP has no DP guarantee.
 
 ## Verification
-Membership inference compares disjoint, appropriately matched member/non-member samples with attack evaluation data held out from attack fitting. Report AUC, sample sizes and protocol; near 0.5 is weak discrimination in this experiment, not proof of privacy. ART integration follows the core FL/consent/DP pipeline.
+Membership inference compares disjoint, appropriately matched member/non-member samples with attack evaluation data held out from attack fitting. Report AUC, sample sizes and protocol; near 0.5 is weak discrimination in this experiment, not proof of privacy. A loss-threshold baseline is implemented with the existing PyTorch/scikit-learn stack. ART and stronger attacks remain deferred.
 
 Exclude real PHI, secrets, raw images and sensitive record fields from logs and external tools. Do not claim HIPAA/DPDP compliance, cryptographic audit integrity, machine unlearning or deployment-level hospital isolation.
 

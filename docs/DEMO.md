@@ -1,35 +1,52 @@
-# Manual test guide and measured evidence
+# Five-minute demo
 
-Start the application using README.md. Open http://127.0.0.1:8000. All records represent public dataset images, not verified patient identities.
+Use README.md's prepare/serve commands before judging. First preparation needs internet and downloads; serving the prepared demo uses cached data and local assets. Do not prepare or install dependencies on stage.
 
-## Features to test
+## Rehearsal checklist
 
-1. **Initialize and inspect hospitals.** Click Load / initialize public dataset. Expect three ready hospitals, 256 records each and visibly different normal/pneumonia distributions. Eligible counts may be lower because previous withdrawals persist. Initialization must not restore withdrawn consent.
-2. **Non-DP comparison.** Select No DP and three rounds, then Start training. Expect progress, three local baseline results and three federated round results. Accuracy, AUROC, F1, recall, specificity and validation-selected threshold are shown; test count is 624. A second training job cannot start concurrently.
-3. **DP accounting.** Select noise 1.2 and run three rounds. Expect epsilon/delta and per-hospital noise, clipping, sample rate and accountant history. Epsilon accumulates across rounds. Repeat with noise 2.0 for the comparison plot/table; compare runs with the same cohorts/settings. Exact metrics vary because DP randomness is not seeded.
-4. **Withdraw consent.** In Patient portal, select an active record and withdraw. Expect status withdrawn, next-round eligibility No, a timestamped audit event and hospital eligibility reduced by one. Run a new experiment: its round details must show the reduced count. The withdrawn record's receipt must not gain eligibility entries for those later rounds. Old entries remain visible.
-5. **Regrant and persistence.** Grant consent again. Expect eligibility restored and a new audit event. Reload the page and reinitialize: consent history and experiment results remain. Withdrawal during an already-started round applies at the next snapshot, not retroactively.
-6. **Receipts and errors.** Switch hospitals/records and inspect project, purpose, policy and history. DP receipts describe eligibility, not proof of individual Poisson sampling. At `/docs`, an unknown record returns 404; an invalid consent status or out-of-range experiment configuration returns 422. Stop the backend temporarily: the open UI should report connection failure and stale results.
+- Open http://127.0.0.1:8001 and check all hospitals show READY.
+- Keep `artifacts/submission/manifest.json` beside you: it identifies the actual run IDs for each noise setting and the withdrawal proof. New preparations produce new IDs and random DP results.
+- Open `artifacts/submission/backup.html` in a browser before presenting. It is a standalone, clearly labeled recorded-evidence page. `evidence.json` contains the full saved configurations and round snapshots.
+- Patient P-A-00015 begins withdrawn after preparation. For a live withdraw demonstration, grant consent before the pitch, then withdraw on stage. Both events are audited. Do not delete or reset history.
+- The prepared two-round withdrawal run remains reproducible evidence even if the live run is slow. It includes the record in round 1 and excludes it in round 2.
 
-The browser smoke test left `P-A-00015` withdrawn, so Hospital A currently has 255 eligible records. Grant it again if you want the original equal-sized cohort. Existing runs include earlier fixed-threshold experiments, explicitly labeled legacy. Use the run IDs below for the validated three-round comparison.
+## Flow and words to use
 
-## Actual measured runs (2026-10-07)
+| Time | Show | Say / prove |
+| --- | --- | --- |
+| 0:00–0:35 | Hospital network | Three disjoint cohorts have different label mixes: A 177/79, B 57/199, C 14/242 normal/pneumonia. Local data bias changes model behavior. These are logical boundaries in one process. |
+| 0:35–1:15 | Select the three-round non-DP experiment from the manifest | Compare local A/B/C with the real federated result on the same 624-record test set. Federation AUROC 0.726 exceeds B 0.697 and C 0.619, but not A 0.750. Do not imply universal improvement. |
+| 1:15–1:40 | Expand round-by-round results | Show collaborative training and actual round progression. All models use validation-selected thresholds and the same epoch budget. Test data never trains the model. |
+| 1:40–2:20 | Patient portal | Identify project, purpose and policy. Withdraw the active simulated record. Status becomes excluded; hospital eligibility drops by one. Explain that previous model influence remains. |
+| 2:20–2:55 | Start one non-DP round, then inspect patient receipt | Exclusion appears explicitly in the new snapshot. If live timing is awkward, select the prepared withdrawal run: round 1 eligible, round 2 excluded. State that this is saved evidence. |
+| 2:55–3:40 | Privacy evidence, select the three-round DP 1.2 run | Show epsilon 7.293 at delta 0.00001, clipping 1 and accountant history. Compare the three matched-cohort noise settings. Explain lower epsilon versus measured utility; do not promise monotonic utility from one random trial. |
+| 3:40–4:15 | Membership-inference measurement | Show held-out attack AUROC, balanced accuracy, TPR/FPR and sample counts. Around 0.52 is weak discrimination for this attack, not proof of privacy or evidence that DP eliminated attacks. |
+| 4:15–4:40 | Patient receipt / Export evidence | Consent events, eligibility snapshots, configuration and actual results are downloadable. Audit is ordinary SQLite history, not cryptographically tamper-proof. |
+| 4:40–5:00 | Close on value | The proposed product is a consent-enforcement and evidence layer for research collaboration. A hospital pilot must validate integration, adoption and willingness to pay. |
 
-All below used 256 records/hospital, three rounds, two local epochs/round, seed 42 for initialization, batch size 64, SGD learning rate 0.1, clipping 1 and delta 0.00001. Validation: official 524 records; test: official 624 records. Thresholds maximize Youden J on validation only. Values below are rounded.
+## Prepared evidence, 2026-10-07
 
-| Run ID | Noise | Final AUROC | Final accuracy | Maximum hospital epsilon |
+Same 768-record initial cohort, 3 rounds, 2 local epochs/round, seed 42, batch 64, SGD 0.1, clipping 1, delta 1e-5. Attack evaluation contains 252 members and 252 matched nonmembers; separate calibration contains the same counts. Members denote ever-eligible records, not logged individual Poisson draws.
+
+| Run prefix | Noise | Model AUROC | ε max | Attack AUROC |
 | --- | ---: | ---: | ---: | ---: |
-| a542b93e30754c288a36def33f4516ad | 0 | 0.726 | 0.671 | No DP |
-| e9a6422a2c2644d4b084d0d3bfbef4ea | 0.8 | 0.615 | 0.566 | 14.552 |
-| 9a9b4c8bbbf1421498e8206241063371 | 1.2 | 0.609 | 0.554 | 7.293 |
-| dab2c16e6f6149728059db70c31d80f2 | 2.0 | 0.603 | 0.558 | 3.396 |
+| d68445c0 | 0 | 0.726 | No DP | 0.519 |
+| 21c6e8a3 | 0.8 | 0.619 | 14.552 | 0.517 |
+| 04113d43 | 1.2 | 0.621 | 7.293 | 0.517 |
+| a34273a6 | 2.0 | 0.595 | 3.396 | 0.516 |
 
-Non-DP local AUROCs: A 0.750, B 0.697, C 0.619. Federation did not outperform the strongest hospital; do not claim universal accuracy improvement. This small demo demonstrates integration and the measured tradeoff, not a clinically useful model. Epsilon is per run, not composed across this table.
+Withdrawal run `21c7143e` changes Hospital A from 256 to 255 between rounds; P-A-00015 is excluded in round 2. Its final AUROC is 0.733 versus local A 0.686, B 0.691 and C 0.608, but its changing cohort/two-round configuration is not directly comparable to the table above. Do not hide this distinction.
 
-Browser-launched run `2df418e33d4049468d05da265397ecb3` succeeded after withdrawal with A=255, B=256, C=256; its A snapshot excluded `P-A-00015`. A separate automated integration test withdraws between rounds and verifies exclusion plus accountant continuity.
+## Failures and fallback
 
-## Automated evidence
+- **Server restart:** rerun the same serve command. The cache loads automatically; audit and consent remain. A job interrupted before final persistence is failed, never silently reported as succeeded. Start a new experiment.
+- **No internet:** prepared demo still works with its archive/cache; do not delete `data/`. No fonts or scripts load from external CDNs.
+- **Training error:** keep the failed label visible and inspect an earlier successful run. Partial rounds are labeled as part of a failed run. Never describe them as a completed experiment.
+- **Backend unavailable:** UI marks displayed results stale and disables mutations. Restart and retry; do not claim a live withdrawal succeeded offline.
+- **Backend cannot recover in time:** open `backup.html`; announce recorded evidence. It supports results/audit presentation, not live interaction. Full evidence is adjacent in JSON.
+- **Port occupied:** choose another localhost `--port` and use that URL. Never kill an unknown process to free the port.
+- **Fresh rehearsal:** use a new `--directory` and prepare before judging. Existing databases are intentionally not reset.
 
-The test suite covers partition isolation/reproducibility, metrics serialization, fail-closed consent scope/status, idempotent consent/audit updates, malformed/unknown API input, hostile Host headers, withdrawal between rounds, cumulative DP history persistence, empty Poisson batches, evaluation-only test access, zero-client skipping and insufficient-hospital failure. The frontend production build checks TypeScript and bundles successfully.
+## Features to test manually
 
-Saved results can serve as a demo backup only when clearly labeled a replay. Runtime data is local and is not shipped in Git. Never substitute invented metrics if an experiment fails.
+Initialization without resetting consent; non-DP local/federated comparison; DP budget growth; filtered comparable-run plot; measured attack protocol; withdrawal/regrant; explicit next-round exclusion; downloadable receipt/evidence; keyboard navigation; narrow screens; malformed requests through `/docs`; stale-state recovery after stopping/restarting the server. Screen-reader and full assistive-technology certification remain unverified.

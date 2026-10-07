@@ -1,120 +1,102 @@
 import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import './style.css';
 
-type Metrics = {accuracy:number; auroc:number|null; f1:number; sensitivity:number|null; specificity:number|null; test_count:number; threshold:number};
+type Metrics = {accuracy:number; auroc:number|null; f1:number; sensitivity:number|null; specificity:number|null; test_count:number; threshold?:number};
 type Hospital = {id:string; records:number; eligible:number; status:string; distribution:Record<string,number>|null};
 type Patient = {patient_id:string; hospital:string; status:string; project:string; purpose:string; policy:string};
-type Privacy = {epsilon:number; delta:number; noise_multiplier:number; clipping:number};
-type Round = {round:number; metrics:Metrics|null; epsilon_max:number|null; hospitals:Record<string,{count:number; status:string; privacy?:Privacy|null}>};
-type Run = {id:string; status:string; config:{noise:number; rounds:number; epochs:number; delta:number}; rounds:Round[]; baselines:Record<string,{metrics?:Metrics; status?:string}>; error:string|null; privacy_scope:string; started_at:string; evaluation?:string};
-type Receipt = {record:Patient; eligible_now:boolean; history:{id:number; action:string; at:string}[]; rounds:{run_id:string; round:number; participation:string; privacy:Privacy|null}[]; withdrawal_explanation:string; raw_data:string; identity:string; initial_consent:string};
+type Privacy = {epsilon:number; delta:number; noise_multiplier:number; clipping:number; sample_rate:number; history:number[][]};
+type Round = {round:number; snapshot_at:string; metrics:Metrics|null; epsilon_max:number|null; hospitals:Record<string,{count:number; status:string; eligible_ids:string[]; privacy?:Privacy|null}>};
+type Attack = {status:string; reason?:string; auroc?:number; balanced_accuracy?:number; tpr?:number; fpr?:number; counts?:Record<string,number>; scope?:string; limitation?:string};
+type Run = {id:string; status:string; config:{noise:number; rounds:number; epochs:number; delta:number; seed:number; batch_size:number; learning_rate:number; clipping:number}; rounds:Round[]; baselines:Record<string,{metrics?:Metrics; status?:string}>; error:string|null; privacy_scope:string; started_at:string; evaluation?:string; attack?:Attack};
+type Receipt = {record:Patient; eligible_now:boolean; history:{id:number; action:string; at:string}[]; rounds:{run_id:string; round:number; snapshot_at:string; eligible:boolean; participation:string; privacy:Privacy|null}[]; withdrawal_explanation:string; raw_data:string};
+type Health = {busy:boolean; initialized:boolean};
 
 async function api<T>(path:string, body?:unknown):Promise<T> {
-  const response = await fetch(`/api${path}`, body === undefined ? undefined : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const response = await fetch(`/api${path}`, {...(body === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),signal:AbortSignal.timeout(path==='/initialize'?120000:15000)});
   if (!response.ok) {
     const error = await response.json().catch(()=>({}));
-    throw new Error(typeof error.detail === 'string' ? error.detail : `Request failed (${response.status})`);
+    throw new Error(typeof error.detail === 'string' ? error.detail : `Request failed (${response.status}). Check your inputs and try again.`);
   }
   return response.json();
 }
-const value = (v:number|null|undefined) => v == null ? 'Unavailable' : v.toFixed(3);
-
-function Results({metrics}:{metrics:Metrics}) {
-  return <span>Accuracy {value(metrics.accuracy)} · AUROC {value(metrics.auroc)} · F1 {value(metrics.f1)} · Recall {value(metrics.sensitivity)} · Specificity {value(metrics.specificity)} · Test n={metrics.test_count} · Threshold {value(metrics.threshold)}</span>;
+const value = (v:number|null|undefined) => v == null ? 'Not measured' : v.toFixed(3);
+const percent = (v:number|null|undefined) => v == null ? 'Not measured' : `${(v*100).toFixed(1)}%`;
+const date = (s:string) => new Date(s).toLocaleString();
+const runLabel = (r:Run) => `${r.config.noise?`DP · noise ${r.config.noise}`:'Non-DP'} · ${r.config.rounds} rounds · ${r.id.slice(0,8)} · ${r.status}`;
+function MetricTable({rows}:{rows:{name:string; metrics:Metrics}[]}) {
+  return <div className="table-scroll" tabIndex={0} aria-label="Model metrics, scroll horizontally if needed"><table><caption>Same official test split · thresholds selected on validation for calibrated runs</caption><thead><tr><th>Model</th><th>AUROC</th><th>Accuracy</th><th>Recall</th><th>Specificity</th><th>F1</th></tr></thead><tbody>{rows.map(r=><tr key={r.name}><th>{r.name}</th><td>{value(r.metrics.auroc)}</td><td>{percent(r.metrics.accuracy)}</td><td>{percent(r.metrics.sensitivity)}</td><td>{percent(r.metrics.specificity)}</td><td>{value(r.metrics.f1)}</td></tr>)}</tbody></table></div>;
 }
-
 function App() {
-  const [view,setView] = useState('researcher');
-  const [hospitals,setHospitals] = useState<Hospital[]>([]);
-  const [runs,setRuns] = useState<Run[]>([]);
-  const [patients,setPatients] = useState<Patient[]>([]);
-  const [hospital,setHospital] = useState('A');
-  const [patient,setPatient] = useState('');
-  const [receipt,setReceipt] = useState<Receipt|null>(null);
-  const [error,setError] = useState('');
-  const [connectionError,setConnectionError] = useState('');
-  const [message,setMessage] = useState('');
-  const [pending,setPending] = useState(false);
-  const [training,setTraining] = useState(false);
-  const [noise,setNoise] = useState(0);
-  const [rounds,setRounds] = useState(3);
-
+  const [view,setView]=useState('research');
+  const [hospitals,setHospitals]=useState<Hospital[]>([]),[runs,setRuns]=useState<Run[]>([]),[health,setHealth]=useState<Health>({busy:false,initialized:false});
+  const [selected,setSelected]=useState(''),[hospital,setHospital]=useState('A'),[patients,setPatients]=useState<Patient[]>([]),[patient,setPatient]=useState(''),[receipt,setReceipt]=useState<Receipt|null>(null);
+  const [error,setError]=useState(''),[connectionError,setConnectionError]=useState(''),[message,setMessage]=useState(''),[pending,setPending]=useState(false),[loaded,setLoaded]=useState(false);
+  const [noise,setNoise]=useState(0),[rounds,setRounds]=useState(3),[updated,setUpdated]=useState('');
   async function refresh() {
-    const [h,r,health] = await Promise.all([api<Hospital[]>('/hospitals'),api<Run[]>('/experiments'),api<{busy:boolean}>('/health')]);
-    setHospitals(h); setRuns(r); setTraining(health.busy);
+    const [h,r,s]=await Promise.all([api<Hospital[]>('/hospitals'),api<Run[]>('/experiments'),api<Health>('/health')]);
+    setHospitals(h);setRuns(r);setHealth(s);setLoaded(true);setUpdated(new Date().toLocaleTimeString());setConnectionError('');
   }
   useEffect(()=>{
-    let alive = true;
-    const poll = () => refresh().then(()=>{if(alive)setConnectionError('');}).catch(e=>{if(alive)setConnectionError(`Backend unavailable: ${e.message}. Displayed results may be stale.`);});
-    void poll(); const timer = window.setInterval(poll,3000);
-    return ()=>{alive=false; window.clearInterval(timer);};
+    let alive=true;let timer:number;
+    const poll=async()=>{try{await refresh();}catch(e){if(alive)setConnectionError(`Connection lost. Results may be stale. ${(e as Error).message}`);}finally{if(alive)timer=window.setTimeout(poll,3000);}};
+    void poll();return()=>{alive=false;clearTimeout(timer);};
   },[]);
   useEffect(()=>{
-    let alive=true;
-    api<Patient[]>(`/patients?hospital=${hospital}`).then(p=>{if(alive){setPatients(p);setPatient(p[0]?.patient_id??'');}}).catch(e=>setError(e.message));
-    return ()=>{alive=false;};
+    let alive=true;setPatients([]);setPatient('');setReceipt(null);
+    api<Patient[]>(`/patients?hospital=${hospital}`).then(p=>{if(alive){setPatients(p);setPatient(p[0]?.patient_id??'');}}).catch(e=>{if(alive)setError(e.message);});
+    return()=>{alive=false;};
   },[hospital,hospitals.reduce((n,h)=>n+h.records,0)]);
   useEffect(()=>{
-    let alive=true; setReceipt(previous=>previous?.record.patient_id===patient?previous:null);
-    if(patient) api<Receipt>(`/patients/${patient}/receipt`).then(r=>{if(alive)setReceipt(r);}).catch(e=>setError(e.message));
-    return ()=>{alive=false;};
+    let alive=true;setReceipt(previous=>previous?.record.patient_id===patient?previous:null);
+    if(patient)api<Receipt>(`/patients/${patient}/receipt`).then(r=>{if(alive)setReceipt(r);}).catch(e=>{if(alive)setError(e.message);});
+    return()=>{alive=false;};
   },[patient,runs]);
-
   async function action(fn:()=>Promise<void>) {
     setPending(true);setError('');setMessage('');
-    try {await fn();await refresh();} catch(e) {setError((e as Error).message);} finally {setPending(false);}
+    try{await fn();await refresh();}catch(e){setError((e as Error).message);}finally{setPending(false);}
   }
-  const completed = runs.filter(r=>r.status==='succeeded' && r.rounds.length);
-  const withDP = completed.filter(r=>r.config.noise>0);
-  return <main>
-    <h1>FedConsent Health</h1>
-    <p>Consent and training evidence for hospital research teams</p>
-    <p><strong>Local educational simulation · Public data only · No clinical or compliance claims</strong></p>
-    <p>Role switching below is a demo control, not authentication. Do not expose this server publicly.</p>
-    <nav aria-label="Views"><button onClick={()=>setView('researcher')} aria-pressed={view==='researcher'}>Researcher dashboard</button>{' '}<button onClick={()=>setView('patient')} aria-pressed={view==='patient'}>Patient portal</button></nav>
-    {error && <p role="alert">{error}</p>}
-    {connectionError && <p role="alert">{connectionError}</p>}
-    <p role="status" aria-live="polite">{pending?'Processing…':message}</p>
-    {view==='researcher' ? <>
-      <h2>Hospital simulation</h2>
-      <button disabled={pending||training} onClick={()=>void action(async()=>{await api('/initialize',{});setMessage('Dataset ready. Existing withdrawals were preserved.');})}>Load / initialize public dataset</button>
-      <p>First load downloads PneumoniaMNIST. Demo uses up to 256 training records per hospital; all models use the same official test split.</p>
-      <table><caption>Logical hospital boundaries, not network isolation</caption><thead><tr><th>Hospital</th><th>Status</th><th>Eligible / records</th><th>Label distribution</th></tr></thead><tbody>{hospitals.map(h=><tr key={h.id}><th>{h.id}</th><td>{h.status}</td><td>{h.eligible} / {h.records}</td><td>{h.distribution?`Normal ${h.distribution.normal}; pneumonia ${h.distribution.pneumonia}`:'Load dataset to inspect'}</td></tr>)}</tbody></table>
-      <h2>Run experiment</h2>
-      <form onSubmit={e=>{e.preventDefault();void action(async()=>{const run=await api<{id:string}>('/experiments',{noise,rounds,epochs:2});setMessage(`Experiment queued: ${run.id}`);});}}>
-        <label>Privacy configuration <select value={noise} onChange={e=>setNoise(Number(e.target.value))}><option value={0}>No DP — local baselines + federation</option><option value={.8}>DP noise 0.8</option><option value={1.2}>DP noise 1.2</option><option value={2}>DP noise 2.0</option></select></label>{' '}
-        <label>Rounds <input type="number" min={1} max={10} value={rounds} onChange={e=>setRounds(Number(e.target.value))}/></label>{' '}
-        <button disabled={pending||training||!hospitals.some(h=>h.records)}>Start training</button>
-      </form>
-      <p>{training?'Training/initialization in progress. Consent changes remain available.':'No active job.'}</p>
-      <p>Noise settings are experimental, not medical safety thresholds. Epsilon is measured after training at delta 0.00001. Non-DP comparisons mean this demo has no joint DP guarantee.</p>
-      <p>Privacy accounting is record-level and conditional on public cohort metadata. Secure RNG is disabled for this local research demonstration.</p>
-      <h2>Experiment evidence</h2>
-      {!runs.length && <p>No experiments yet. Initialize the dataset, then run the non-DP baseline.</p>}
-      {runs.map(r=><section key={r.id}><h3>{r.config.noise?`DP noise ${r.config.noise}`:'Non-DP'} — {r.status}</h3><p>Run {r.id} · {r.started_at} · round {r.rounds.length}/{r.config.rounds}</p>{r.error&&<p role="alert">{r.error}</p>}
-        <p>{r.evaluation??'Legacy run: fixed classification threshold 0.5.'}</p>
-        {Object.entries(r.baselines).map(([h,b])=><p key={h}>Hospital {h} local only: {b.metrics?<Results metrics={b.metrics}/>:b.status}</p>)}
-        {r.rounds.map(round=><p key={round.round}>Federation round {round.round}: {round.metrics&&<Results metrics={round.metrics}/>} · ε max {value(round.epsilon_max)}{r.config.noise>0?` at δ ${r.config.delta}`:' (no DP)'}</p>)}
-        <details><summary>Round eligibility and privacy configuration</summary><pre>{JSON.stringify(r.rounds.map(x=>({round:x.round,hospitals:Object.fromEntries(Object.entries(x.hospitals).map(([h,v])=>[h,{count:v.count,status:v.status,privacy:v.privacy}]))})),null,2)}</pre></details>
-      </section>)}
-      <h2>Privacy / utility comparison</h2>
-      <p>Each point is a completed run. Compare configurations only when cohorts, rounds and training settings match.</p>
-      {withDP.length===0?<p>No measured DP results yet.</p>:<><svg viewBox="0 0 420 240" width="420" style={{maxWidth:'100%'}} role="img" aria-label="Privacy utility plot: x is epsilon, y is AUROC"><line x1="45" y1="205" x2="400" y2="205" stroke="currentColor"/><line x1="45" y1="205" x2="45" y2="15" stroke="currentColor"/><text x="170" y="235">ε (lower: more privacy)</text><text x="0" y="12">AUROC</text><text x="15" y="205">0</text><text x="15" y="25">1</text>{withDP.map(r=>{const last=r.rounds.at(-1)!;const epsilon=last.epsilon_max??0;const max=Math.max(...withDP.map(x=>x.rounds.at(-1)!.epsilon_max??0),1);return <g key={r.id}><circle cx={45+epsilon/max*330} cy={205-(last.metrics?.auroc??0)*180} r="5" fill="currentColor"><title>{`Noise ${r.config.noise}; epsilon ${value(epsilon)}; AUROC ${value(last.metrics?.auroc)}`}</title></circle></g>;})}</svg>
-        <table><caption>Exact measured values (accessible alternative to plot)</caption><thead><tr><th>Noise</th><th>ε max</th><th>δ</th><th>AUROC</th></tr></thead><tbody>{withDP.map(r=><tr key={r.id}><td>{r.config.noise}</td><td>{value(r.rounds.at(-1)!.epsilon_max)}</td><td>{r.config.delta}</td><td>{value(r.rounds.at(-1)!.metrics?.auroc)}</td></tr>)}</tbody></table></>}
-    </>:<>
-      <h2>Patient consent and receipt</h2>
-      <label>Hospital <select disabled={pending} value={hospital} onChange={e=>setHospital(e.target.value)}>{['A','B','C'].map(h=><option key={h}>{h}</option>)}</select></label>{' '}
-      <label>Simulated record <select disabled={pending} value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.patient_id}>{p.patient_id}</option>)}</select></label>
-      {!patient&&<p>Initialize the dataset in the researcher view first.</p>}
-      {patient&&!receipt&&<p>Loading receipt…</p>}
-      {receipt&&<><p>{receipt.identity} {receipt.initial_consent}</p><dl><dt>Research project</dt><dd>{receipt.record.project}</dd><dt>Purpose</dt><dd>{receipt.record.purpose}</dd><dt>Policy</dt><dd>{receipt.record.policy}</dd><dt>Consent</dt><dd>{receipt.record.status}</dd><dt>Eligible for next round</dt><dd>{receipt.eligible_now?'Yes':'No'}</dd></dl>
-        <button disabled={pending} onClick={()=>void action(async()=>{await api(`/patients/${patient}/consent`,{status:receipt.record.status==='active'?'withdrawn':'active'});setReceipt(await api(`/patients/${patient}/receipt`));setMessage('Consent saved. The next round recalculates eligibility.');})}>{receipt.record.status==='active'?'Withdraw consent':'Grant consent'}</button>
-        <p>{receipt.withdrawal_explanation}</p><p>{receipt.raw_data}</p>
-        <h3>Consent history</h3>{receipt.history.length?<ul>{receipt.history.map(a=><li key={a.id}>{a.at}: {a.action}</li>)}</ul>:<p>No consent changes. Initial active consent was simulated.</p>}
-        <h3>Recorded round eligibility</h3>{receipt.rounds.length?<ul>{receipt.rounds.map(r=><li key={`${r.run_id}-${r.round}`}>Run {r.run_id}, round {r.round}: {r.participation} {r.privacy?`ε ${value(r.privacy.epsilon)}, δ ${r.privacy.delta}`:'No DP'}</li>)}</ul>:<p>No recorded round eligibility yet.</p>}
-      </>}
+  const run=runs.find(r=>r.id===selected)??runs.find(r=>r.evaluation&&r.status==='succeeded')??runs[0];
+  const final=run?.rounds.at(-1);
+  const rows=run?Object.entries(run.baselines).flatMap(([h,b])=>b.metrics?[{name:`Hospital ${h} · local`,metrics:b.metrics}]:[]):[];
+  if(final?.metrics)rows.push({name:'Federated model',metrics:final.metrics});
+  const comparable=(r:Run)=>run&&r.status==='succeeded'&&r.evaluation===run.evaluation&&['rounds','epochs','delta','seed','batch_size','learning_rate','clipping'].every(k=>r.config[k as keyof Run['config']]===run.config[k as keyof Run['config']])&&JSON.stringify(r.rounds.map(x=>Object.values(x.hospitals).map(h=>h.eligible_ids)))===JSON.stringify(run.rounds.map(x=>Object.values(x.hospitals).map(h=>h.eligible_ids)));
+  const comparisons=runs.filter(comparable);
+  const points=comparisons.filter(r=>r.config.noise>0&&r.rounds.at(-1)?.epsilon_max!=null&&r.rounds.at(-1)?.metrics?.auroc!=null);
+  const maxEpsilon=Math.max(1,...points.map(r=>r.rounds.at(-1)!.epsilon_max!));
+  const active=runs.find(r=>['running','queued'].includes(r.status));
+  return <div className="app"><a className="skip" href="#workspace">Skip to workspace</a>
+    <aside className="sidebar">
+      <a className="brand" href="#workspace"><img className="brand-mark" src="/icon.svg" aria-hidden="true" alt="" /><span>FedConsent<small>HEALTH RESEARCH</small></span></a>
+      <nav aria-label="Workspace views">{[['research','/ResearchOverview.svg','Research overview'],['privacy','/PrivacyEvidence.svg','Privacy evidence'],['patient','/PatientConsent.svg','Patient portal']].map(([id,icon,label])=><button key={id} aria-pressed={view===id} onClick={()=>setView(id)}><img src={icon} alt="" aria-hidden="true" /><span>{label}</span></button>)}</nav>
+    </aside>
+    <nav className="pill-nav" aria-label="Mobile workspace views">{[['research','/ResearchOverview.svg','Research overview'],['privacy','/PrivacyEvidence.svg','Privacy evidence'],['patient','/PatientConsent.svg','Patient portal']].map(([id,icon,label])=><button key={id} aria-pressed={view===id} onClick={()=>setView(id)} title={label}><img src={icon} alt="" aria-hidden="true" />{view===id && <span>{label}</span>}</button>)}</nav>
+    <main id="workspace"><header className="topbar">
+      <a className="brand mobile-brand" href="#workspace"><img className="brand-mark" src="/icon.svg" aria-hidden="true" alt="" /><span>FedConsent<small>HEALTH RESEARCH</small></span></a>
+    </header>
+    <div className="content"><div className="page-heading"><div><p className="eyebrow">{view==='patient'?'YOUR CHOICE, RECORDED':view==='privacy'?'MEASURE, DON’T ASSUME':'CONSENT-AWARE FEDERATED LEARNING'}</p><h1>{view==='patient'?'Patient consent':view==='privacy'?'Privacy evidence':'Research overview'}</h1><p>{view==='patient'?'Control future research eligibility. See what changed and when.':view==='privacy'?'Inspect the privacy budget, utility tradeoff, and measured attack.':'Compare hospital models. Train together. Keep consent in the loop.'}</p></div><div className="freshness">{connectionError?'Offline / stale':loaded?`Updated ${updated}`:'Connecting…'}<br/><span className="muted">Local workstation</span></div></div>
+    {connectionError&&<div className="notice error" role="alert">{connectionError} <button onClick={()=>void action(async()=>{})}>Retry connection</button></div>}
+    {error&&<div className="notice error" role="alert">{error} <button onClick={()=>setError('')}>Dismiss</button></div>}
+    <div role="status" aria-live="polite">{pending?<p className="notice">Working… Please wait.</p>:message?<p className="notice success">{message}</p>:null}</div>
+    {!loaded&&!connectionError&&<p className="notice">Loading saved experiments and consent…</p>}
+    {view!=='patient'&&<>
+      {view==='research'&&<><section aria-labelledby="hospitals-title"><div className="section-heading"><div><h2 id="hospitals-title">Hospital network</h2><p>Disjoint training cohorts · model updates exchanged through Flower</p></div><button className="secondary" disabled={pending||health.busy||!!connectionError} onClick={()=>void action(async()=>{await api('/initialize',{});setMessage('Dataset ready. Existing consent choices were preserved.');})}>{health.initialized?'Reload dataset':'Initialize dataset'}</button></div><div className="hospitals">{hospitals.map((h,i)=><article className={`hospital hospital-${h.id}`} key={h.id}><div className="hospital-top"><span className="hospital-icon" aria-hidden="true">H{i+1}</span><span className="badge">{h.status.startsWith('ready')?'READY':'LOAD DATA'}</span></div><h3>Hospital {h.id}</h3><p className="count">{h.eligible}<small> / {h.records} eligible</small></p><div className="distribution" aria-hidden="true"><span style={{width:`${h.distribution&&h.records?h.distribution.normal/h.records*100:0}%`}}/></div><p className="legend">Normal <strong>{h.distribution?.normal??'—'}</strong><span>Pneumonia <strong>{h.distribution?.pneumonia??'—'}</strong></span></p><footer>{h.records-h.eligible} excluded by consent</footer></article>)}</div><p className="caption">Logical boundaries in one trusted process. This demo does not physically isolate hospital data.</p></section>
+      <section className="panel training"><div><p className="eyebrow">EXPERIMENT CONTROL</p><h2>Train with current consent</h2><p>Eligibility is captured before each round.<br/>Two local epochs per round · seed 42</p></div><form onSubmit={e=>{e.preventDefault();void action(async()=>{const r=await api<{id:string}>('/experiments',{noise,rounds,epochs:2});setSelected(r.id);setMessage(`Training queued: ${r.id.slice(0,8)}. Consent changes remain available.`);});}}><label>Privacy configuration<select value={noise} onChange={e=>setNoise(Number(e.target.value))}><option value={0}>No DP · local + federated</option><option value={.8}>DP · noise 0.8</option><option value={1.2}>DP · noise 1.2</option><option value={2}>DP · noise 2.0</option></select></label><label>Rounds<input type="number" min={1} max={10} required value={rounds} onChange={e=>setRounds(Number(e.target.value))}/></label><button className="primary" disabled={pending||health.busy||!health.initialized||!!connectionError}>Start training <span aria-hidden="true">↗</span></button></form><p className="job-status" role="status">{health.busy?active?`Training ${active.rounds.length}/${active.config.rounds} rounds · ${active.id.slice(0,8)}`:'Loading data…':health.initialized?'Ready to train':'Initialize the dataset to begin. First load requires internet.'}</p></section></>}
+      <section className="panel evidence"><div className="section-heading"><div><p className="eyebrow">SAVED EXPERIMENTS</p><h2>{view==='privacy'?'Privacy & utility':'Model comparison'}</h2></div>{run&&<a className="button secondary" href={`/api/experiments/${run.id}/download`} download>Export evidence ↓</a>}</div>
+      {!runs.length?<div className="empty"><h3>No measured results yet</h3><p>Initialize the dataset, then run a non-DP experiment to compare local and federated models.</p></div>:<><label className="run-selector">Experiment<select value={run?.id} onChange={e=>setSelected(e.target.value)}>{runs.map(r=><option key={r.id} value={r.id}>{runLabel(r)}{!r.evaluation?' · legacy':''}</option>)}</select></label>{run&&<><div className="run-meta"><span className={`badge ${run.status==='failed'?'bad':''}`}>{run.status.toUpperCase()}</span><span>{date(run.started_at)}</span><code>{run.id.slice(0,8)}</code><span>{run.rounds.length}/{run.config.rounds} rounds saved</span></div>{run.error&&<p className="notice error" role="alert">{run.error} Previous completed rounds remain below; this is not a successful final result.</p>}{!run.evaluation&&run.rounds.length>0&&<p className="notice">Legacy experiment: fixed threshold 0.5. Use a new run for calibrated results.</p>}
+      {view==='research'?<><div className="metric-strip"><div><span>Federated AUROC</span><strong>{value(final?.metrics?.auroc)}</strong><small>Ranking discrimination · higher is better</small></div><div><span>Federated accuracy</span><strong>{percent(final?.metrics?.accuracy)}</strong><small>{final?.metrics?.test_count??'—'} official test records</small></div><div><span>Privacy budget ε</span><strong>{run.config.noise?value(final?.epsilon_max):'No DP'}</strong><small>{run.config.noise?`Maximum hospital ε · δ ${run.config.delta}`:'Unprotected training baseline'}</small></div></div>
+      {rows.length>0?<><div className="comparison-bars" aria-label="AUROC comparison">{rows.map(r=><div className="bar-row" key={r.name}><span>{r.name}</span><div className="bar-track"><div className={r.name==='Federated model'?'federated':''} style={{width:`${(r.metrics.auroc??0)*100}%`}}/></div><strong>{value(r.metrics.auroc)}</strong></div>)}</div><MetricTable rows={rows}/><p className="caption">Federation may help some hospitals without beating the strongest local model. Compare all metrics; higher accuracy alone can hide label imbalance.</p></>:<p className="empty">Training results will appear after the first model finishes.</p>}
+      {run.rounds.length>0&&<details><summary>Round-by-round metrics and consent snapshots</summary><MetricTable rows={run.rounds.flatMap(r=>r.metrics?[{name:`Round ${r.round}`,metrics:r.metrics}]:[])}/><div className="table-scroll"><table><thead><tr><th>Round</th><th>Snapshot</th><th>Hospital A</th><th>Hospital B</th><th>Hospital C</th></tr></thead><tbody>{run.rounds.map(r=><tr key={r.round}><th>{r.round}</th><td>{date(r.snapshot_at)}</td>{['A','B','C'].map(h=><td key={h}>{r.hospitals[h]?.count??'—'} eligible</td>)}</tr>)}</tbody></table></div></details>}</>:<>
+      <div className="notice">{run.config.noise?`This run: noise ${run.config.noise}, clipping ${run.config.clipping}, δ ${run.config.delta}. Lower epsilon indicates a stronger bound under this mechanism’s assumptions.`:'This selected run has no differential privacy guarantee. Select a DP run to inspect its accountant.'}</div><p>DP limits how much a training record can affect the model. It does not hide consent status, remove past influence, or make a model medically safe.</p><div className="privacy-grid"><div><h3>Measured privacy–utility tradeoff</h3><p className="caption">Only successful runs with identical cohorts, epochs, rounds, seed, clipping and evaluation method are shown.</p>{points.length?<svg viewBox="0 0 480 270" role="img" aria-label="Epsilon versus AUROC. Exact values in the table below."><line x1="55" y1="220" x2="450" y2="220"/><line x1="55" y1="25" x2="55" y2="220"/>{[0,.5,1].map(v=><g key={v}><line className="grid-line" x1="55" x2="450" y1={220-v*190} y2={220-v*190}/><text x="20" y={225-v*190}>{v}</text></g>)}<text x="14" y="16">AUROC</text><text x="140" y="260">ε · lower is more private</text><text x="50" y="240">0</text><text x="420" y="240">{maxEpsilon.toFixed(1)}</text>{points.map(r=><g key={r.id}><circle cx={55+r.rounds.at(-1)!.epsilon_max!/maxEpsilon*380} cy={220-r.rounds.at(-1)!.metrics!.auroc!*190} r="7"><title>{runLabel(r)}: ε {value(r.rounds.at(-1)!.epsilon_max)}, AUROC {value(r.rounds.at(-1)!.metrics?.auroc)}</title></circle></g>)}</svg>:<p className="empty">No comparable DP measurements yet. Run DP with the same cohort and settings.</p>}</div><div><h3>Comparable experiments</h3><div className="table-scroll"><table><thead><tr><th>Run / noise</th><th>ε max</th><th>AUROC</th></tr></thead><tbody>{comparisons.map(r=><tr key={r.id}><th><button className="link" onClick={()=>setSelected(r.id)}>{r.id.slice(0,8)}</button><small>{r.config.noise||'No DP'}</small></th><td>{r.config.noise?value(r.rounds.at(-1)!.epsilon_max):'No DP'}</td><td>{value(r.rounds.at(-1)!.metrics?.auroc)}</td></tr>)}</tbody></table></div></div></div>
+      <h3>Membership-inference measurement</h3>{run.attack?.status==='measured'?<><p>Can a loss-based attacker distinguish training-cohort members from unused records?</p><div className="metric-strip"><div><span>Attack AUROC</span><strong>{value(run.attack.auroc)}</strong><small>0.5 is chance-level discrimination</small></div><div><span>Balanced accuracy</span><strong>{percent(run.attack.balanced_accuracy)}</strong><small>Threshold calibrated on separate records</small></div><div><span>Held-out attack records</span><strong>{(run.attack.counts?.evaluation_members??0)+(run.attack.counts?.evaluation_nonmembers??0)}</strong><small>Matched member / nonmember class mix</small></div></div><p className="caption">TPR {percent(run.attack.tpr)} · FPR {percent(run.attack.fpr)}. {run.attack.limitation}</p><details><summary>Attack protocol and sample counts</summary><p>{run.attack.scope}</p><pre>{JSON.stringify(run.attack.counts,null,2)}</pre></details></>:<p className="empty">{run.attack?.reason??(run.status==='succeeded'?'Not measured for this historical run. Start a new experiment to measure the attack.':'Attack measurement follows training.')}</p>}
+      <details><summary>Accountant evidence by round and hospital</summary><pre>{JSON.stringify(run.rounds.map(r=>({round:r.round,hospitals:Object.fromEntries(Object.entries(r.hospitals).map(([h,v])=>[h,{count:v.count,privacy:v.privacy??'No DP'}]))})),null,2)}</pre></details><p className="caption">{run.privacy_scope} Secure RNG is disabled. Attack statistics and public evaluation data are outside the training DP mechanism.</p></>}
+      </>}</>}
+      </section>
     </>}
-  </main>;
+    {view==='patient'&&<><p className="notice">Demo role switch, not authentication. These IDs represent public dataset images, not verified patients.</p><section className="panel"><div className="section-heading"><div><p className="eyebrow">CONSENT REGISTRY</p><h2>Your research choice</h2></div>{receipt&&<a className="button secondary" href={`/api/patients/${patient}/receipt?download=true`} download>Download receipt ↓</a>}</div><div className="patient-select"><label>Hospital<select disabled={pending} value={hospital} onChange={e=>setHospital(e.target.value)}>{['A','B','C'].map(h=><option key={h}>{h}</option>)}</select></label><label>Simulated record<select disabled={pending||!patients.length} value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.patient_id}>{p.patient_id}</option>)}</select></label></div>{!patient?<p className="empty">Initialize the dataset in Research overview to see records.</p>:!receipt?<p className="empty">Loading your receipt…</p>:<><div className={`consent-banner ${receipt.eligible_now?'allowed':'withdrawn'}`}><div><span className="badge">{receipt.record.status.toUpperCase()}</span><h3>{receipt.eligible_now?'Eligible for future rounds':'Excluded from future rounds'}</h3><p>{receipt.eligible_now?'Your record can enter the next training snapshot.':'Your record will not enter the next training snapshot.'}</p></div><button className={receipt.record.status==='active'?'danger':'primary'} disabled={pending||!!connectionError} onClick={()=>void action(async()=>{await api(`/patients/${patient}/consent`,{status:receipt.record.status==='active'?'withdrawn':'active'});setReceipt(await api(`/patients/${patient}/receipt`));setMessage('Consent saved and audited. The next round uses your updated choice.');})}>{receipt.record.status==='active'?'Withdraw consent':'Grant consent'}</button></div><dl className="scope"><div><dt>Project</dt><dd>{receipt.record.project}</dd></div><div><dt>Purpose</dt><dd>{receipt.record.purpose}</dd></div><div><dt>Policy version</dt><dd>{receipt.record.policy}</dd></div></dl><div className="notice"><strong>What withdrawal means</strong><p>{receipt.withdrawal_explanation} A round already started may still use its earlier snapshot.</p></div><p className="caption">Initial consent was simulated. {receipt.raw_data}</p>
+      <div className="privacy-grid"><section><h3>Consent history</h3>{receipt.history.length?<ol className="timeline">{receipt.history.map(a=><li key={a.id}><strong>{a.action==='active'?'Consent granted':'Consent withdrawn'}</strong><time>{date(a.at)}</time></li>)}</ol>:<p className="empty">No changes yet. Initial active consent was simulated.</p>}</section><section><h3>Round eligibility receipt</h3><p className="caption">Eligibility is not proof of individual Poisson sampling or contribution to accuracy.</p>{receipt.rounds.length?<div className="receipt-list">{receipt.rounds.map(r=><article key={`${r.run_id}-${r.round}`}><span className={`badge ${r.eligible?'':'bad'}`}>{r.eligible?'ELIGIBLE':'EXCLUDED'}</span><strong>Round {r.round} · {r.run_id.slice(0,8)}</strong><p>{r.participation}</p><small>{date(r.snapshot_at)}</small></article>)}</div>:<p className="empty">No saved round snapshots yet.</p>}</section></div></>}
+    </section></>}
+    <footer className="page-footer"><strong>FedConsent Health</strong><span>Consent enforcement + inspectable research evidence</span><p>Local public-data prototype. No authentication, secure aggregation, clinical validation or combined privacy guarantee across runs.</p></footer>
+    </div></main></div>;
 }
-
 createRoot(document.getElementById('root')!).render(<App/>);

@@ -8,7 +8,7 @@ from typing import Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict
@@ -31,6 +31,7 @@ def create_app(store=None, data=None):
     load_dotenv()
     store = store or Store(os.getenv("FEDCONSENT_DATABASE_URL", "sqlite:///./data/fedconsent.db"))
     busy = Lock()
+    # ponytail: one local process; a durable worker queue is needed before multi-worker hosting.
     pool = ThreadPoolExecutor(max_workers=1)
 
     @asynccontextmanager
@@ -41,6 +42,12 @@ def create_app(store=None, data=None):
                 run["status"] = "failed"
                 run["error"] = "Previous process stopped before this experiment completed."
                 store.save_run(run)
+        # Recover local tensors after restart without a network download at startup.
+        if app.state.datasets is None and store.records() and (Path(os.getenv("FEDCONSENT_DATA_DIR", "data")) / "pneumoniamnist.npz").exists():
+            try:
+                app.state.datasets, _, _ = initialize(store, os.getenv("FEDCONSENT_DATA_DIR", "data"))
+            except Exception:
+                logging.exception("Cached dataset recovery failed; initialize again from the dashboard")
         yield
         pool.shutdown(wait=True)
 
@@ -49,13 +56,21 @@ def create_app(store=None, data=None):
     app.add_middleware(CORSMiddleware,
                        allow_origins=os.getenv("FEDCONSENT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
                        allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+
+    @app.middleware("http")
+    async def reject_foreign_mutations(request, call_next):
+        origin = request.headers.get("origin")
+        allowed = os.getenv("FEDCONSENT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        if request.method == "POST" and origin and origin not in allowed + [str(request.base_url).rstrip("/")]:
+            return JSONResponse({"detail": "Untrusted browser origin"}, status_code=403)
+        return await call_next(request)
     app.state.store = store
     app.state.datasets = data
 
     @app.get("/api/health")
     def health():
         return {"status": "ok", "mode": "local public-data simulation", "busy": busy.locked(),
-                "initialized": bool(store.records())}
+                "initialized": app.state.datasets is not None}
 
     @app.post("/api/initialize")
     def initialize_demo():
@@ -89,7 +104,7 @@ def create_app(store=None, data=None):
         return store.records(hospital)
 
     @app.get("/api/patients/{patient_id}/receipt")
-    def receipt(patient_id: str):
+    def receipt(patient_id: str, download: bool = False):
         record = next((r for r in store.records() if r["patient_id"] == patient_id), None)
         if record is None:
             raise HTTPException(404, "Unknown simulated record")
@@ -97,15 +112,17 @@ def create_app(store=None, data=None):
         for run in store.runs():
             for entry in run["rounds"]:
                 hospital = entry["hospitals"].get(record["hospital"], {})
-                if patient_id in hospital.get("eligible_ids", []):
+                if hospital:
                     rounds.append({"run_id": run["id"], "round": entry["round"], "snapshot_at": entry["snapshot_at"],
                                    "status": run["status"], "privacy": hospital.get("privacy"),
-                                   "participation": hospital.get("participation")})
-        return {"record": record, "eligible_now": any(r["patient_id"] == patient_id for r in store.eligible(record["hospital"])),
+                                   "eligible": patient_id in hospital.get("eligible_ids", []),
+                                   "participation": hospital.get("participation") if patient_id in hospital.get("eligible_ids", []) else "Excluded from this round snapshot."})
+        result = {"record": record, "eligible_now": any(r["patient_id"] == patient_id for r in store.eligible(record["hospital"])),
                 "history": store.audit(patient_id), "rounds": rounds, "withdrawal_explanation": WITHDRAWAL,
                 "raw_data": "No raw images are sent in Flower messages. Boundaries are logical within one local process, not independently attested.",
                 "identity": "Synthetic record identity; not a verified real patient.",
                 "initial_consent": "Demo records start with simulated active consent; no real consent was obtained."}
+        return JSONResponse(result, headers={"Content-Disposition": 'attachment; filename="consent-receipt.json"'}) if download else result
 
     @app.post("/api/patients/{patient_id}/consent")
     def consent(patient_id: str, change: ConsentChange):
@@ -122,6 +139,13 @@ def create_app(store=None, data=None):
     @app.get("/api/experiments")
     def experiments():
         return store.runs()
+
+    @app.get("/api/experiments/{run_id}/download")
+    def download_experiment(run_id: str):
+        run = next((r for r in store.runs() if r['id'] == run_id), None)
+        if run is None:
+            raise HTTPException(404, "Unknown experiment")
+        return JSONResponse(run, headers={"Content-Disposition": 'attachment; filename="experiment-evidence.json"'})
 
     @app.post("/api/experiments", status_code=202)
     def start(config: ExperimentConfig):

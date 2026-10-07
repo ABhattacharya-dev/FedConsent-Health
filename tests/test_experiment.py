@@ -39,7 +39,18 @@ def test_withdrawal_changes_next_round_training_and_dp_accumulates(tmp_path):
     assert persisted["rounds"][-1]["metrics"]["test_count"] == 8
 
 
-def test_no_test_data_enters_training_and_zero_hospital_skips(tmp_path):
+def test_no_test_data_enters_training_and_zero_hospital_skips(tmp_path, monkeypatch):
+    from flwr.serverapp.strategy import FedAvg
+    aggregate = FedAvg.aggregate_train
+
+    def inspect_messages(self, round_number, replies):
+        for reply in replies:
+            assert set(reply.content.keys()) == {'arrays', 'metrics'}
+            assert set(reply.content['metrics'].keys()) == {'num-examples'}
+            assert all(key.endswith(('weight', 'bias')) for key in reply.content['arrays'].to_torch_state_dict())
+        return aggregate(self, round_number, replies)
+
+    monkeypatch.setattr(FedAvg, 'aggregate_train', inspect_messages)
     store, data = setup(tmp_path)
     for row in store.records("C"):
         store.consent(row["patient_id"], "withdrawn")

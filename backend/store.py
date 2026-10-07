@@ -55,9 +55,24 @@ class Store:
             return [dict(row) for row in db.execute(text(query + " ORDER BY patient_id"), {"hospital": hospital}).mappings()]
 
     def eligible(self, hospital):
-        return [r for r in self.records(hospital) if r["status"] == "active"
+        return [r for r in self.records(hospital) if self.is_eligible(r)]
+
+    @staticmethod
+    def is_eligible(r):
+        from federation.data import HOSPITALS, patient_id
+        return (r["hospital"] in HOSPITALS and r["patient_id"] == patient_id(r["hospital"], r["record_index"])
+                and r["status"] == "active"
                 and r["project"] == PROJECT and r["purpose"] == PURPOSE and r["policy"] == POLICY
-                and r["granted_at"] is not None and r["withdrawn_at"] is None]
+                and r["granted_at"] is not None and r["withdrawn_at"] is None)
+
+    def snapshot(self):
+        from federation.data import HOSPITALS
+        # One transaction defines the boundary across all hospitals and consent writes.
+        with self.engine.begin() as db:
+            db.exec_driver_sql("BEGIN IMMEDIATE")
+            at = now()
+            rows = list(db.execute(text("SELECT * FROM records ORDER BY patient_id")).mappings())
+            return at, {h: [dict(r) for r in rows if r["hospital"] == h and self.is_eligible(r)] for h in HOSPITALS}
 
     def consent(self, patient_id, status):
         if status not in ("active", "withdrawn"):

@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader, Subset
 from backend.store import Store, now
 from federation.data import HOSPITALS, load_data, partition
 from federation.model import evaluate, model, train, validation_threshold
+from federation.attack import measure_attack
 
 
 class ExperimentConfig(BaseModel):
@@ -50,7 +51,7 @@ def new_run(config):
             "privacy_scope": "This run only; record-level training mechanism conditional on fixed/public cohort metadata. Comparisons include non-DP releases, so no joint DP guarantee is claimed.",
             "simulation": "Sequential local hospitals; Flower Message API and FedAvg aggregation. No network/process isolation.",
             "secure_rng": False, "model": "conv4-conv8-linear-v1", "optimizer": "SGD",
-            "error": None}
+            "attack": {"status": "pending"}, "error": None}
 
 
 def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts"):
@@ -58,7 +59,7 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
     torch.set_num_threads(2)
     run = run or new_run(config)
     run["status"] = "running"
-    run["versions"] = {p: importlib.metadata.version(p) for p in ("torch", "flwr", "opacus", "medmnist")}
+    run["versions"] = {p: importlib.metadata.version(p) for p in ("torch", "flwr", "opacus", "medmnist", "scikit-learn")}
     run["split_sizes"] = {name: len(dataset) for name, dataset in data.items()}
     run["dataset"] = {"name": "PneumoniaMNIST", "source": INFO["pneumoniamnist"]["url"],
                       "license": INFO["pneumoniamnist"]["license"], "archive_md5": INFO["pneumoniamnist"]["MD5"]}
@@ -95,11 +96,11 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
             if round_hook:
                 round_hook(round_number)
             # Freeze every hospital's eligible cohort before any client trains.
-            snapshots = {h: store.eligible(h) for h in HOSPITALS}
+            snapshot_at, snapshots = store.snapshot()
             active = [h for h in HOSPITALS if snapshots[h]]
             if len(active) < 2:
                 raise ValueError("Insufficient hospitals with eligible records (minimum two)")
-            entry = {"round": round_number, "snapshot_at": now(), "hospitals": {}, "metrics": None}
+            entry = {"round": round_number, "snapshot_at": snapshot_at, "hospitals": {}, "metrics": None}
             replies = []
             for node, hospital in enumerate(HOSPITALS, 1):
                 records = snapshots[hospital]
@@ -140,6 +141,14 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
             entry["epsilon_max"] = max((v["privacy"]["epsilon"] for v in entry["hospitals"].values() if v.get("privacy")), default=None)
             run["rounds"].append(entry)
             store.save_run(run)
+        members = {int(pid.rsplit("-", 1)[1]) for entry in run["rounds"]
+                   for hospital in entry["hospitals"].values() for pid in hospital["eligible_ids"]}
+        try:
+            run["attack"] = measure_attack(global_model, data["train"], members, config.seed)
+        except Exception:
+            import logging
+            logging.exception("Attack measurement failed")
+            run["attack"] = {"status": "unavailable", "reason": "Attack evaluation failed; training results remain valid. Check local logs."}
         destination = Path(artifacts) / run["id"]
         destination.mkdir(parents=True, exist_ok=True)
         torch.save(global_model.state_dict(), destination / "model.pt")

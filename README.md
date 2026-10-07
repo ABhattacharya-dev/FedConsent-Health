@@ -1,21 +1,28 @@
 # FedConsent Health
 
-A local educational prototype for hospital research teams: consent-aware federated pneumonia research with measured privacy and audit evidence. P0 is operational and ready for user review; visual styling is deferred.
+Consent-aware federated pneumonia research for hospital research teams. Three simulated hospitals train with scoped consent; withdrawal changes the next round, and researchers can inspect measured utility, DP accounting, membership-inference results and audit receipts.
 
-## Run locally
+**Hackathon prototype:** public data, logical hospital boundaries, localhost only. No real patient authentication or clinical/compliance claims.
 
-Prerequisites: uv and Node/npm. Run from the repository root:
+## Setup and deterministic demo flow
+
+Requires uv and Node/npm. Run from this repository root:
 
 ```powershell
 uv sync --locked
 npm --prefix frontend ci
 npm --prefix frontend run build
-uv run uvicorn backend.app:app --host 127.0.0.1 --port 8000
+uv run --locked python -m demo prepare
+uv run --locked python -m demo serve --port 8001
 ```
 
-Open http://127.0.0.1:8000 and select **Load / initialize public dataset**. First initialization downloads PneumoniaMNIST; subsequent initialization preserves consent changes. Python 3.11 is pinned. Optional configuration is documented in `.env.example`; defaults work without an `.env` file.
+Open **http://127.0.0.1:8001**. Preparation downloads PneumoniaMNIST if needed, measures four comparable experiments and a between-round withdrawal, and saves an offline backup. It uses a separate `artifacts/submission/demo.db`; your existing working database is preserved.
 
-Use one server process without reload/workers. Do not run CLI training against the same database while the server is training. The in-process job lock is for a single local demo, not distributed scheduling.
+**Prepare once.** If already prepared, run only `serve`. To rehearse from fresh state, use a new `--directory artifacts/rehearsal-2` on both commands; preparation refuses to overwrite an existing database. Workflow, cohorts and configurations are fixed; DP noise remains random, so repeated metrics are not bit-for-bit identical.
+
+On restart, cached tensors reload automatically, consent/results persist, and interrupted jobs become explicitly failed. One process only; no concurrent CLI training against the server's database.
+
+For the original working database instead: `uv run uvicorn backend.app:app --host 127.0.0.1 --port 8000`. Optional paths/CORS settings are in `.env.example`.
 
 ## Verify
 
@@ -24,26 +31,16 @@ uv run --locked pytest -q
 npm --prefix frontend run build
 ```
 
-For a standalone experiment, with server training stopped:
+Verified: 19 tests, production build, real training/attack measurements, browser consent changes, mobile reflow and server restart recovery. Detailed evidence and remaining checks are in [the submission notes](docs/SUBMISSION.md).
 
-```powershell
-uv run python -m federation.experiment --noise 0 --rounds 3 --epochs 2
-uv run python -m federation.experiment --noise 1.2 --rounds 3 --epochs 2
-```
+## Presentation kit
 
-Experiment results and consent history persist in SQLite. Model weights and result JSON are saved under `artifacts/<run-id>/`. Runtime artifacts and datasets are intentionally excluded from Git.
+- [Five-minute demo and fallback](docs/DEMO.md)
+- [Judging coverage, pitch and Q&A](docs/SUBMISSION.md)
+- [Architecture diagram](docs/ARCHITECTURE.md)
+- [Privacy assumptions and limitations](docs/PRIVACY.md)
+- [Open-source reuse and licenses](docs/REUSE.md)
 
-## What works
+Stack: Python 3.11, PyTorch, Flower, Opacus, MedMNIST, scikit-learn, FastAPI, SQLAlchemy/SQLite, React/TypeScript/Vite. No additional service is required. Data/model artifacts stay out of Git.
 
-- Three disjoint, non-IID hospital cohorts, capped at 256 records each; local baselines and Flower FedAvg.
-- Scoped consent, audited withdrawal/regrant, per-round eligibility and simulated patient receipts.
-- Opacus DP-SGD with cumulative accounting across rounds within each run; measured epsilon/utility comparison.
-- FastAPI and React researcher/patient views, persistent results, loading/error states and an accessible results table.
-
-See [the manual test guide and measured results](docs/DEMO.md), [architecture](docs/ARCHITECTURE.md), [privacy limits](docs/PRIVACY.md), [reuse decisions](docs/REUSE.md), [tooling](docs/TOOLING.md), and [current plan](.agent/CURRENT_PLAN.md).
-
-## Limits
-
-Public/simulated data only; no clinical validation, diagnostic suitability or compliance claims. Hospital boundaries are logical within one trusted process. Role switching is not authentication: keep the server on localhost. Withdrawal affects future round snapshots and does not remove past influence. DP values describe each training run, conditional on public cohort/evaluation data; repeated experiments and non-DP comparisons have no joint DP guarantee. Secure RNG is disabled. Membership-inference evaluation, deployment and styling remain deferred.
-
-Tested features remain on their feature branch until user acceptance; no automatic merge or push.
+Withdrawal does not erase prior model influence. DP values apply to each training run conditional on public cohort/evaluation metadata, not all experiments jointly; secure RNG is disabled. The attack is one small baseline, not a privacy proof. The local coordinator can access all images in memory; this is not a distributed data-residency deployment.
