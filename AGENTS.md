@@ -2,9 +2,9 @@
 
 ## Product and working agreement
 - Build a 24-hour educational prototype for hospital research teams: consent-aware federated pneumonia research with measured privacy and audit evidence. Read `.agent/CURRENT_PLAN.md` before work; detailed context is in `docs/PROJECT_BRIEF.md`.
-- Discuss consequential product choices, challenge weak assumptions, and implement one agreed milestone at a time. Ask when missing information affects correctness or scope; handle routine reversible choices autonomously.
+- Discuss consequential product choices and meaningful doubts before changing direction. Investigate first; make reversible engineering decisions autonomously and continue milestone-by-milestone through operational P0. Ask only for strategic changes, infeasibility, irreversible/external actions, or materially stronger alternatives.
 - **Do not start styling, visual polish, animations, or a design-system pass until the user explicitly authorizes the styling phase.** Build core structure and functional, accessible interactions first.
-- Avoid overwork. Reuse maintained open-source libraries, models, datasets, and existing code before writing replacements. Present meaningful reuse options and their licenses/tradeoffs for discussion before adopting an entire project or changing the agreed stack.
+- Avoid overwork. Suggest maintained open-source libraries, models, datasets and databases before writing replacements. Evaluate licenses and tradeoffs, then reuse within the agreed scope autonomously. If no suitable option can be found, ask the user for leads before building substantial replacement infrastructure.
 - Market impact, differentiation, scalability, and profitability are hypotheses to validate, not guarantees. Prefer an end-to-end demonstration over breadth.
 
 ## Architecture and privacy invariants
@@ -26,6 +26,7 @@
 ## Git and definition of done
 - Create `feature/<short-name>` branches for new features. Commit coherent work using `feature(feature_name) : short description`; initial repository commit: `init: project initialised`. Do not invent author identity.
 - Keep tested work on its feature branch as **ready for user review**. A feature is complete only after the user says so; merge into `main` only following that acceptance. Never auto-merge because checks pass.
+- Continue dependent implementation on stacked feature branches without waiting for acceptance unless substantial rework risk requires discussion.
 - Record remaining problems honestly in `.agent/CURRENT_PLAN.md`; do not commit known-broken work as complete. Preserve user changes. Do not push or create a remote unless requested.
 
 ## Local skills and tools
