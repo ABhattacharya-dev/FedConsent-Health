@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict
 from pathlib import Path
 
@@ -44,6 +45,7 @@ def create_app(store=None, data=None):
         pool.shutdown(wait=True)
 
     app = FastAPI(title="FedConsent Health — local simulation", lifespan=lifespan)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
     app.add_middleware(CORSMiddleware,
                        allow_origins=os.getenv("FEDCONSENT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
                        allow_methods=["GET", "POST"], allow_headers=["Content-Type"])

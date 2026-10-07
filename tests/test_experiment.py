@@ -32,6 +32,7 @@ def test_withdrawal_changes_next_round_training_and_dp_accumulates(tmp_path):
     assert first["count"] == 16 and second["count"] == 15
     assert second["privacy"]["epsilon"] > first["privacy"]["epsilon"] > 0
     assert sum(h[2] for h in second["privacy"]["history"]) == first["steps"] + second["steps"]
+    assert sum(h[2] for h in first["privacy"]["history"]) == first["steps"]
     assert store.runs()[0]["status"] == "succeeded"
     persisted = json.loads((tmp_path / "artifacts" / run["id"] / "result.json").read_text())
     assert persisted["config"]["delta"] == 1e-5
@@ -59,3 +60,20 @@ def test_no_test_data_enters_training_and_zero_hospital_skips(tmp_path):
     with pytest.raises(ValueError, match="Insufficient"):
         execute(store, data, ExperimentConfig(rounds=1, epochs=1), artifacts=tmp_path / "artifacts")
     assert store.runs()[0]["status"] == "failed"
+
+
+def test_empty_poisson_batch_still_accounts_for_noise_step():
+    from opacus import PrivacyEngine
+    from torch.utils.data import DataLoader
+    from federation.model import model, train
+
+    net = model()
+    optimizer = torch.optim.SGD(net.parameters(), lr=.1)
+    engine = PrivacyEngine(accountant="rdp")
+    net, optimizer, _ = engine.make_private(
+        module=net, optimizer=optimizer,
+        data_loader=DataLoader(TensorDataset(torch.rand(2, 1, 28, 28), torch.tensor([0, 1])), batch_size=1),
+        noise_multiplier=1.2, max_grad_norm=1)
+    train(net, [(torch.empty(0, 1, 28, 28), torch.empty(0, dtype=torch.long))], optimizer, 1)
+    assert sum(h[2] for h in engine.accountant.history) == 1
+    assert all(torch.isfinite(p).all() for p in net.parameters())

@@ -21,3 +21,11 @@ Account for repeated rounds and released versions; resetting optimizer/model obj
 Membership inference compares disjoint, appropriately matched member/non-member samples with attack evaluation data held out from attack fitting. Report AUC, sample sizes and protocol; near 0.5 is weak discrimination in this experiment, not proof of privacy. ART integration follows the core FL/consent/DP pipeline.
 
 Exclude real PHI, secrets, raw images and sensitive record fields from logs and external tools. Do not claim HIPAA/DPDP compliance, cryptographic audit integrity, machine unlearning or deployment-level hospital isolation.
+
+## Implemented accounting boundary
+
+Each hospital has one Opacus RDP accountant per experiment. All scheduled steps, including empty Poisson batches, accumulate across rounds. Saved histories are snapshots, not mutable aliases. Changing eligible subsets changes sampling rates; recorded RDP history retains each rate/noise/step tuple. Eligibility, counts and evaluation data are treated as public/fixed side information: consent membership itself is not protected by the reported epsilon.
+
+Displayed epsilon is the maximum of the three disjoint hospital accountants for that run. Separate runs are not composed into a dataset-wide budget. Because this demo also releases non-DP baselines and models, no combined DP guarantee is claimed. Validation-selected thresholds and test metrics use public evaluation records outside the protected training cohort. Secure RNG is disabled: this is measured research accounting, not a hardened privacy deployment.
+
+The local API has no authenticated patient/hospital authorization. All roles can read and change simulated records. Bind to localhost only; adding real identities or external access requires authentication and explicit cross-patient/hospital authorization before use. Host/CORS restrictions are not substitutes for those controls.

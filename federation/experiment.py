@@ -3,13 +3,14 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 
 os.environ.setdefault("FLWR_TELEMETRY_ENABLED", "0")
 
 import torch
-from flwr.app import ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.app import ArrayRecord, Message, Metadata, MetricRecord, RecordDict
 from flwr.serverapp.strategy import FedAvg
 from opacus import PrivacyEngine
 from medmnist import INFO
@@ -18,7 +19,7 @@ from torch.utils.data import DataLoader, Subset
 
 from backend.store import Store, now
 from federation.data import HOSPITALS, load_data, partition
-from federation.model import evaluate, model, train
+from federation.model import evaluate, model, train, validation_threshold
 
 
 class ExperimentConfig(BaseModel):
@@ -62,6 +63,7 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
     run["dataset"] = {"name": "PneumoniaMNIST", "source": INFO["pneumoniamnist"]["url"],
                       "license": INFO["pneumoniamnist"]["license"], "archive_md5": INFO["pneumoniamnist"]["MD5"]}
     run["training_split"] = "official train only; capped hospital cohorts are explicitly listed"
+    run["evaluation"] = "Threshold maximizes Youden J on official validation split; metrics use official test split. Same procedure for every model."
     store.save_run(run)
     try:
         torch.manual_seed(config.seed)
@@ -85,7 +87,7 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
                 subset = Subset(data["train"], [r["record_index"] for r in records])
                 steps = train(net, DataLoader(subset, batch_size=config.batch_size, shuffle=True),
                               torch.optim.SGD(net.parameters(), lr=config.learning_rate), config.epochs * config.rounds)
-                run["baselines"][hospital] = {"metrics": evaluate(net, data["test"]), "steps": steps,
+                run["baselines"][hospital] = {"metrics": evaluate(net, data["test"], validation_threshold(net, data["val"])), "steps": steps,
                                               "eligible_ids": [r["patient_id"] for r in records]}
                 store.save_run(run)
         strategy = FedAvg(min_train_nodes=2, min_available_nodes=2, fraction_evaluate=0)
@@ -123,14 +125,18 @@ def execute(store, data, config, run=None, round_hook=None, artifacts="artifacts
                 entry["hospitals"][hospital] = {"count": len(records), "status": "trained", "steps": steps,
                                                 "eligible_ids": [r["patient_id"] for r in records], "privacy": privacy,
                                                 "participation": "Eligibility recorded; individual Poisson draws are not logged." if config.noise else "All eligible records used."}
-                request = Message(content=RecordDict(), dst_node_id=node, message_type="train")
+                # The runtime normally stamps Metadata. Our pinned, in-process
+                # simulation supplies it explicitly without modifying global TaskIdentity.
+                metadata = Metadata(run_id=int(run["id"][:12], 16), message_id=f"{round_number}-{node}",
+                                    src_node_id=node, dst_node_id=0, reply_to_message_id=f"round-{round_number}",
+                                    group_id=str(round_number), created_at=time.time(), ttl=3600, message_type="train")
                 replies.append(Message(content=RecordDict({"arrays": ArrayRecord(bare.state_dict()),
-                                                         "metrics": MetricRecord({"num-examples": len(records)})}), reply_to=request))
+                                                         "metrics": MetricRecord({"num-examples": len(records)})}), metadata=metadata))
             arrays, _ = strategy.aggregate_train(round_number, replies)
             if arrays is None:
                 raise ValueError("Flower did not return aggregated model parameters")
             global_model.load_state_dict(arrays.to_torch_state_dict())
-            entry["metrics"] = evaluate(global_model, data["test"])
+            entry["metrics"] = evaluate(global_model, data["test"], validation_threshold(global_model, data["val"]))
             entry["epsilon_max"] = max((v["privacy"]["epsilon"] for v in entry["hospitals"].values() if v.get("privacy")), default=None)
             run["rounds"].append(entry)
             store.save_run(run)

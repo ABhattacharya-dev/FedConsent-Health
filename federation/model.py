@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, roc_auc_score
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, roc_auc_score, roc_curve
 from torch import nn
 from torch.utils.data import DataLoader
 
@@ -38,18 +38,31 @@ def train(net, loader, optimizer, epochs):
     return steps
 
 
-def evaluate(net, dataset):
+def predict(net, dataset):
     net.eval()
     probabilities, truth = [], []
     with torch.no_grad():
         for images, labels in DataLoader(dataset, batch_size=256):
             probabilities.extend(net(images).softmax(1)[:, 1].tolist())
             truth.extend(labels.tolist())
-    predicted = np.asarray(probabilities) >= .5
+    return np.asarray(probabilities), truth
+
+
+def validation_threshold(net, validation):
+    probabilities, truth = predict(net, validation)
+    fpr, tpr, thresholds = roc_curve(truth, probabilities)
+    # Youden's J balances sensitivity/specificity using validation data only.
+    valid = np.isfinite(thresholds)
+    return float(thresholds[valid][np.argmax((tpr - fpr)[valid])])
+
+
+def evaluate(net, dataset, threshold=.5):
+    probabilities, truth = predict(net, dataset)
+    predicted = probabilities >= threshold
     tn, fp, fn, tp = confusion_matrix(truth, predicted, labels=[0, 1]).ravel()
     return {"accuracy": float(accuracy_score(truth, predicted)),
             "auroc": float(roc_auc_score(truth, probabilities)) if len(set(truth)) == 2 else None,
             "f1": float(f1_score(truth, predicted, zero_division=0)),
             "sensitivity": float(tp / (tp + fn)) if tp + fn else None,
             "specificity": float(tn / (tn + fp)) if tn + fp else None,
-            "test_count": len(truth)}
+            "test_count": len(truth), "threshold": threshold}

@@ -1,12 +1,12 @@
 import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 
-type Metrics = {accuracy:number; auroc:number|null; f1:number; sensitivity:number|null; specificity:number|null; test_count:number};
+type Metrics = {accuracy:number; auroc:number|null; f1:number; sensitivity:number|null; specificity:number|null; test_count:number; threshold:number};
 type Hospital = {id:string; records:number; eligible:number; status:string; distribution:Record<string,number>|null};
 type Patient = {patient_id:string; hospital:string; status:string; project:string; purpose:string; policy:string};
 type Privacy = {epsilon:number; delta:number; noise_multiplier:number; clipping:number};
 type Round = {round:number; metrics:Metrics|null; epsilon_max:number|null; hospitals:Record<string,{count:number; status:string; privacy?:Privacy|null}>};
-type Run = {id:string; status:string; config:{noise:number; rounds:number; epochs:number; delta:number}; rounds:Round[]; baselines:Record<string,{metrics?:Metrics; status?:string}>; error:string|null; privacy_scope:string; started_at:string};
+type Run = {id:string; status:string; config:{noise:number; rounds:number; epochs:number; delta:number}; rounds:Round[]; baselines:Record<string,{metrics?:Metrics; status?:string}>; error:string|null; privacy_scope:string; started_at:string; evaluation?:string};
 type Receipt = {record:Patient; eligible_now:boolean; history:{id:number; action:string; at:string}[]; rounds:{run_id:string; round:number; participation:string; privacy:Privacy|null}[]; withdrawal_explanation:string; raw_data:string; identity:string; initial_consent:string};
 
 async function api<T>(path:string, body?:unknown):Promise<T> {
@@ -20,7 +20,7 @@ async function api<T>(path:string, body?:unknown):Promise<T> {
 const value = (v:number|null|undefined) => v == null ? 'Unavailable' : v.toFixed(3);
 
 function Results({metrics}:{metrics:Metrics}) {
-  return <span>Accuracy {value(metrics.accuracy)} · AUROC {value(metrics.auroc)} · F1 {value(metrics.f1)} · Recall {value(metrics.sensitivity)} · Specificity {value(metrics.specificity)} · Test n={metrics.test_count}</span>;
+  return <span>Accuracy {value(metrics.accuracy)} · AUROC {value(metrics.auroc)} · F1 {value(metrics.f1)} · Recall {value(metrics.sensitivity)} · Specificity {value(metrics.specificity)} · Test n={metrics.test_count} · Threshold {value(metrics.threshold)}</span>;
 }
 
 function App() {
@@ -32,6 +32,7 @@ function App() {
   const [patient,setPatient] = useState('');
   const [receipt,setReceipt] = useState<Receipt|null>(null);
   const [error,setError] = useState('');
+  const [connectionError,setConnectionError] = useState('');
   const [message,setMessage] = useState('');
   const [pending,setPending] = useState(false);
   const [training,setTraining] = useState(false);
@@ -44,7 +45,7 @@ function App() {
   }
   useEffect(()=>{
     let alive = true;
-    const poll = () => refresh().then(()=>{if(alive)setError('');}).catch(e=>{if(alive)setError(`Backend unavailable: ${e.message}`);});
+    const poll = () => refresh().then(()=>{if(alive)setConnectionError('');}).catch(e=>{if(alive)setConnectionError(`Backend unavailable: ${e.message}. Displayed results may be stale.`);});
     void poll(); const timer = window.setInterval(poll,3000);
     return ()=>{alive=false; window.clearInterval(timer);};
   },[]);
@@ -54,7 +55,7 @@ function App() {
     return ()=>{alive=false;};
   },[hospital,hospitals.reduce((n,h)=>n+h.records,0)]);
   useEffect(()=>{
-    let alive=true; setReceipt(null);
+    let alive=true; setReceipt(previous=>previous?.record.patient_id===patient?previous:null);
     if(patient) api<Receipt>(`/patients/${patient}/receipt`).then(r=>{if(alive)setReceipt(r);}).catch(e=>setError(e.message));
     return ()=>{alive=false;};
   },[patient,runs]);
@@ -72,6 +73,7 @@ function App() {
     <p>Role switching below is a demo control, not authentication. Do not expose this server publicly.</p>
     <nav aria-label="Views"><button onClick={()=>setView('researcher')} aria-pressed={view==='researcher'}>Researcher dashboard</button>{' '}<button onClick={()=>setView('patient')} aria-pressed={view==='patient'}>Patient portal</button></nav>
     {error && <p role="alert">{error}</p>}
+    {connectionError && <p role="alert">{connectionError}</p>}
     <p role="status" aria-live="polite">{pending?'Processing…':message}</p>
     {view==='researcher' ? <>
       <h2>Hospital simulation</h2>
@@ -86,9 +88,11 @@ function App() {
       </form>
       <p>{training?'Training/initialization in progress. Consent changes remain available.':'No active job.'}</p>
       <p>Noise settings are experimental, not medical safety thresholds. Epsilon is measured after training at delta 0.00001. Non-DP comparisons mean this demo has no joint DP guarantee.</p>
+      <p>Privacy accounting is record-level and conditional on public cohort metadata. Secure RNG is disabled for this local research demonstration.</p>
       <h2>Experiment evidence</h2>
       {!runs.length && <p>No experiments yet. Initialize the dataset, then run the non-DP baseline.</p>}
       {runs.map(r=><section key={r.id}><h3>{r.config.noise?`DP noise ${r.config.noise}`:'Non-DP'} — {r.status}</h3><p>Run {r.id} · {r.started_at} · round {r.rounds.length}/{r.config.rounds}</p>{r.error&&<p role="alert">{r.error}</p>}
+        <p>{r.evaluation??'Legacy run: fixed classification threshold 0.5.'}</p>
         {Object.entries(r.baselines).map(([h,b])=><p key={h}>Hospital {h} local only: {b.metrics?<Results metrics={b.metrics}/>:b.status}</p>)}
         {r.rounds.map(round=><p key={round.round}>Federation round {round.round}: {round.metrics&&<Results metrics={round.metrics}/>} · ε max {value(round.epsilon_max)}{r.config.noise>0?` at δ ${r.config.delta}`:' (no DP)'}</p>)}
         <details><summary>Round eligibility and privacy configuration</summary><pre>{JSON.stringify(r.rounds.map(x=>({round:x.round,hospitals:Object.fromEntries(Object.entries(x.hospitals).map(([h,v])=>[h,{count:v.count,status:v.status,privacy:v.privacy}]))})),null,2)}</pre></details>
@@ -99,8 +103,8 @@ function App() {
         <table><caption>Exact measured values (accessible alternative to plot)</caption><thead><tr><th>Noise</th><th>ε max</th><th>δ</th><th>AUROC</th></tr></thead><tbody>{withDP.map(r=><tr key={r.id}><td>{r.config.noise}</td><td>{value(r.rounds.at(-1)!.epsilon_max)}</td><td>{r.config.delta}</td><td>{value(r.rounds.at(-1)!.metrics?.auroc)}</td></tr>)}</tbody></table></>}
     </>:<>
       <h2>Patient consent and receipt</h2>
-      <label>Hospital <select value={hospital} onChange={e=>setHospital(e.target.value)}>{['A','B','C'].map(h=><option key={h}>{h}</option>)}</select></label>{' '}
-      <label>Simulated record <select value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.patient_id}>{p.patient_id}</option>)}</select></label>
+      <label>Hospital <select disabled={pending} value={hospital} onChange={e=>setHospital(e.target.value)}>{['A','B','C'].map(h=><option key={h}>{h}</option>)}</select></label>{' '}
+      <label>Simulated record <select disabled={pending} value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.patient_id}>{p.patient_id}</option>)}</select></label>
       {!patient&&<p>Initialize the dataset in the researcher view first.</p>}
       {patient&&!receipt&&<p>Loading receipt…</p>}
       {receipt&&<><p>{receipt.identity} {receipt.initial_consent}</p><dl><dt>Research project</dt><dd>{receipt.record.project}</dd><dt>Purpose</dt><dd>{receipt.record.purpose}</dd><dt>Policy</dt><dd>{receipt.record.policy}</dd><dt>Consent</dt><dd>{receipt.record.status}</dd><dt>Eligible for next round</dt><dd>{receipt.eligible_now?'Yes':'No'}</dd></dl>

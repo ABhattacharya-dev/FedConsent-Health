@@ -26,15 +26,15 @@ New local skills should be discoverable on the next turn. RTK's installer reques
 | Tool | Observed state |
 | --- | --- |
 | Git | 2.52.0.windows.1; local author identity already configured; commits work |
-| GitHub CLI | 2.102.0; repository API reads work; no remote configured or pushed |
-| Python | 3.14.2 default; uv-managed 3.12.13 also present; required 3.11 not yet installed |
-| uv | Installed; used for future project-specific Python/dependency management |
+| GitHub CLI | 2.102.0; repository API reads work; user configured the GitHub remote and committed the partial implementation |
+| Python | 3.14.2 default; project uses uv-managed 3.11.15 in .venv |
+| uv | Installed; project environment and uv.lock verified |
 | Node / npm | 24.13.1 / 11.8.0 |
 | Docker | CLI 29.8.0; Linux engine unavailable during inspection; defer containers |
 | NotebookLM CLI | `nlm` 0.12.0; `nlm login --check` succeeds; no notebook content inspected or uploaded |
 | RTK | 0.50.0; `rtk gain` confirms token-optimizer CLI |
 
-`.python-version` pins the intended interpreter, but does not install it. Before milestone 1, provision Python 3.11 with uv, create `.venv`, verify library/platform compatibility and commit an appropriate dependency lock. There are no application test commands yet.
+Project dependencies are installed and locked. Verified application/test commands are in README.md. Docker remains deferred; no notebook data was uploaded. Python package download retries were needed during setup, but installation completed.
 
 ## Skill selection
 

@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from federation.data import load_data, partition
-from federation.model import evaluate, model, train
+from federation.model import evaluate, model, train, validation_threshold
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
         net = model()
         train(net, DataLoader(Subset(datasets["train"], indices), batch_size=64, shuffle=True),
               torch.optim.SGD(net.parameters(), lr=.1), args.epochs)
-        results[hospital] = evaluate(net, datasets["test"])
+        results[hospital] = evaluate(net, datasets["test"], validation_threshold(net, datasets["val"]))
     output = {"seed": 42, "epochs": args.epochs, "learning_rate": .1,
               "partition_counts": {h: len(v) for h, v in parts.items()}, "metrics": results}
     Path("artifacts").mkdir(exist_ok=True)

@@ -1,11 +1,15 @@
-# Proposed architecture
+# Architecture
 
-Status: design only; no services implemented.
+The implemented stack is Python 3.11/PyTorch, Flower FedAvg, Opacus, MedMNIST/scikit-learn, FastAPI/SQLAlchemy/SQLite and React/Vite/TypeScript. Dependency versions are locked.
 
-Each simulated hospital owns one disjoint, deliberately non-IID training partition and maps records to pseudonymous IDs. Before a round, scoped consent determines eligibility. An immutable round snapshot feeds that hospital's DataLoader, local model training and optional Opacus DP-SGD. Flower FedAvg aggregates model updates. The evaluator uses the same untouched official test split for all models.
+`federation/data.py` loads official PneumoniaMNIST splits and creates seeded, disjoint, label-biased training partitions, capped at 256 records per hospital for the demo. The official validation split selects each model's classification threshold; the official test split is evaluation-only.
 
-The coordinator persists safe experiment metadata and model artifacts. FastAPI exposes consent, experiment results and audit events through SQLAlchemy/SQLite. The React application provides researcher and patient views. Consent metadata may be central in this simulation; image records stay within hospital loaders. Centrally visible record identifiers and participation events still require data minimization.
+`federation/experiment.py` trains local baselines with the same total epoch budget as federation. Before every federated round it snapshots scoped consent for each hospital. Eligible subsets feed local training and optional Opacus DP-SGD. Each hospital keeps one RDP accountant throughout the run, including across consent changes. Flower's pinned Message API/FedAvg aggregates model arrays weighted by eligible cohort size. Empty hospitals are skipped; fewer than two eligible hospitals stops the run with a failure status.
 
-Simulation is a logical boundary within a trusted local process, not OS/network isolation. Neither a central process nor a UI label proves deployment-level confidentiality. No patient images should enter APIs, telemetry, NotebookLM or Git.
+`backend/store.py` persists consent, audit events, configuration and measured run metadata in SQLite. `backend/app.py` exposes validated APIs and a single background training worker. The built frontend is served by the same process; Vite development origins are explicitly allowed. Host validation restricts the local demo. Role selection is not authorization: anyone who can access this server can inspect/change simulated consent.
 
-Build directories only as code needs them: `federation/` for training, `backend/` for API/storage, `frontend/` for functional views, and `scripts/` for actual reusable commands. Dependency versions and run commands will be recorded when validated. Docker is deferred until the core works.
+`frontend/src/main.tsx` provides researcher experiments, hospital counts, metrics, privacy comparison and simulated patient consent/receipts. Basic accessible interactions are implemented; visual styling is deferred.
+
+Hospital boundaries are logical within one trusted process, not network/process isolation. Flower messages contain model arrays and counts, not images. The coordinator can access all process memory and stores synthetic eligibility IDs; no independent residency or cryptographic audit attestation exists. DP receipts record eligibility rather than individual sampling events.
+
+Model weights and result JSON are local artifacts; consent and results survive server restarts. Initialize once per process to load tensors. Run one process and one experiment at a time; no distributed queue or deployment infrastructure is included.

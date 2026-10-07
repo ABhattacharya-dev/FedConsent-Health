@@ -9,6 +9,7 @@ def test_consent_api_and_invalid_requests(tmp_path):
     store.seed({"A": [0], "B": [1], "C": [2]}, "api")
     with TestClient(create_app(store)) as client:
         assert client.get("/api/health").status_code == 200
+        assert client.get("/api/health", headers={"host": "untrusted.example"}).status_code == 400
         assert client.get("/api/hospitals").json()[0]["eligible"] == 1
         assert client.post("/api/patients/P-A-00000/consent", json={"status": "bogus"}).status_code == 422
         assert client.post("/api/patients/P-A-00000/consent", json={"status": "active", "hospital": "B"}).status_code == 422
