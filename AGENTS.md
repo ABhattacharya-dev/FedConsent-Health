@@ -36,10 +36,17 @@ Read the applicable entrypoint; use the local copy instead of stacking equivalen
 | `.agents/skills/caveman/SKILL.md` | Concise progress and discussion; preserve technical facts, errors and clear prose. Persisted documentation remains normal prose. |
 | `.agents/skills/ponytail/SKILL.md` | Implementation, architecture and dependency decisions; choose the smallest correct solution without removing validation or required tests. |
 | `.agents/skills/ponytail-review/SKILL.md` | Review a meaningful feature diff for unnecessary complexity before presenting it. |
+| `.agents/skills/fastapi/SKILL.md` | Backend endpoints, Pydantic schemas, dependencies and current FastAPI conventions. Verify suggested APIs against the installed/pinned version before use. |
+| `.agents/skills/security-review/SKILL.md` | Consent/privacy-sensitive changes: authorization, hospital/project isolation, withdrawal, fail-closed eligibility, input validation, logging and audit evidence. Trace real data flows and report evidence, not pattern-only findings. |
+| `.agents/skills/frontend-design/SKILL.md` | Functional UX: information hierarchy, understandable consent/privacy copy, accessible interactions and complete loading/error/empty states. UX carries 15 judging points per the user. Apply visual design/styling guidance only after explicit styling authorization. |
+| `.agents/skills/docker-build-strategies/SKILL.md` | Only when actually containerizing: writing/reviewing Dockerfiles, build caching, image size, non-root execution and build-secret handling. Installation does not authorize starting Docker work. |
 | `RTK.md` | Reduce verbose command output using the installed RTK CLI. Use explicit supported `rtk` commands in PowerShell; inspect full output on ambiguity or failure. Never hide exit codes or route secret-bearing output through its history. |
 | `docs/TOOLING.md` | Installation provenance, environment findings, and tool setup limitations. |
 
 - Use `gh` for repository/source inspection and authorized GitHub work. Use `nlm` for source-grounded research when useful; consult its help, verify authentication, and cite original sources for claims. Never upload secrets or patient data.
-- Use Docker after the core application works if reproducibility/demo value warrants it. Defer design skills until styling is authorized; add other third-party skills only with authorization.
+- FastAPI skill suggestions do not replace the agreed SQLAlchemy stack with SQLModel or authorize extra telemetry/services. Use optional dependencies only for a demonstrated need.
+- Security review must include authenticated paths and cross-patient/hospital authorization; authentication alone never rules out a vulnerability. Review consent invariants and DP/accounting correctness separately from exploit findings; the security skill is not a privacy proof.
+- Use frontend-design's functional UX guidance during core implementation, but defer its art direction, visual thesis, polish and motion work until styling is authorized. Do not install its related skills automatically.
+- Use Docker after the core application works if reproducibility/demo value warrants it. Inspect bundled helper scripts before executing them; no container builds, pruning or deployment are part of skill installation. Add other third-party skills only with authorization.
 
 @RTK.md

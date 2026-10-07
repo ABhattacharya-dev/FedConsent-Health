@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "docker-build-strategies": {
+      "source": "docker/skills",
+      "sourceType": "github",
+      "skillPath": "skills/docker-build-strategies/SKILL.md",
+      "computedHash": "7ea55a874f2cd5346f8eab7725b42b6dbdfc7aa50f97b094b7da97a31999e4a8"
+    },
+    "fastapi": {
+      "source": "fastapi/fastapi",
+      "sourceType": "github",
+      "skillPath": "fastapi/.agents/skills/fastapi/SKILL.md",
+      "computedHash": "d9352016429f7974d7e1cdb7d66e840cdb37bff19a6a121a1711055cb90f47eb"
+    },
+    "frontend-design": {
+      "source": "practicalswan/agent-skills",
+      "sourceType": "github",
+      "skillPath": "frontend-design/SKILL.md",
+      "computedHash": "d2de10b0939fdb8d22c276f90d3baba11a55bfc6ad26d564ac0f3014f919ed96"
+    },
+    "security-review": {
+      "source": "getsentry/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "57e404df6c743ec59b82ed5c1454a4a5234f5012e644ff7ffaa8beccfb1aba43"
+    }
+  }
+}

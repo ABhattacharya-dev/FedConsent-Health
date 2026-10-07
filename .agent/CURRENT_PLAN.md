@@ -1,7 +1,7 @@
 # Current plan
 
 ## Objective and state
-Bootstrap repository rules, local skills, environment inventory and planning documents. State: ready for user review after bootstrap verification. No application code or styling yet. Branch: `feature/project-bootstrap`.
+Install the four additional user-requested skills and map them to their intended project phases. State: ready for user review. Branch: `feature/project-skills`, based on the still-unmerged `feature/project-bootstrap`. No application code or styling yet; bootstrap acceptance remains pending.
 
 ## Product decision
 The user selected **hospital research teams**, focusing on consent enforcement and audit evidence. Proposed positioning: make eligibility and privacy evidence inspectable across collaborative training. Pneumonia detection is the demonstration workload; product value remains to be validated.
@@ -26,6 +26,7 @@ One FastAPI/SQLite application, a Flower simulation with three logical hospital 
 - Pin Python 3.11 in `.python-version`. Resolve and lock dependencies when the ML milestone starts; do not install the full ML/frontend stack during bootstrap.
 - Environment variables are editable; `.env.example` is a proposed contract, not implemented application configuration.
 - RTK is already installed. Install Caveman/Ponytail locally and record immutable upstream revisions.
+- User authorized FastAPI, Sentry security-review, practicalswan frontend-design and Docker build-strategies. Install only these selected skills locally for Codex. Functional UX applies during core work; styling remains explicitly gated and Docker guidance applies only when containerizing.
 
 ## Risks and questions for the next discussion
 - Which concrete research workflow and buyer pain should the demo prove? Initial recommendation: show exactly why a record is eligible and what changes after withdrawal.
@@ -41,6 +42,8 @@ One FastAPI/SQLite application, a Flower simulation with three logical hospital 
 - Created rules, plans, architecture/privacy/demo documents, original brief, README and proposed environment configuration; initialized Git with the user's existing author identity.
 - Verified NotebookLM authentication, GitHub API access and RTK direct invocation/exit-code propagation. Docker engine is stopped; Python 3.11 remains to be provisioned at milestone 1.
 - All three local skills passed Codex's validator (UTF-8 mode). Hook JSON parsed successfully, Git ignores secrets/data/artifacts but tracks `.env.example`, and the staged diff passed whitespace checks. No application tests apply to this documentation/configuration bootstrap.
+- Installed the four requested skills with project-local Codex scope through `npx skills add`. All four pass the bundled validator after metadata-only compatibility adjustments, and `skills list --agent codex` discovers all seven project skills. Recorded upstream content hashes in `skills-lock.json` and review limits in `docs/TOOLING.md`.
+- Updated skill routing for backend conventions, consent/privacy review, functional UX versus gated styling, and deferred Docker work. Sentry's external scanner alert remains unexplained; documented it without presenting this install as a security audit.
 
 ## Next step
-Present the committed bootstrap for user review. Discuss the smallest consent/audit demonstration and upstream reuse before implementing milestone 1. No feature is complete until the user accepts it; leave the feature branch unmerged.
+Present the committed skill additions for user review. Discuss the smallest consent/audit demonstration and upstream reuse before implementing milestone 1. No feature is complete until the user accepts it; leave both feature branches unmerged.
