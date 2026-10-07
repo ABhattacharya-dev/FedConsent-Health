@@ -1332,3 +1332,152 @@ svg circle {
   border-color: #668e85;
   background: #edf5f1
 }
+
+/* Layout shift for Comparison Table */
+.new-comparison-container {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 40px !important;
+  flex-wrap: wrap !important;
+  justify-content: space-between !important;
+}
+.comparison-visuals {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 300px;
+  max-width: 650px;
+}
+.comparison-table-wrapper {
+  flex: 1.5;
+  min-width: 450px;
+  height: 220px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+.comparison-table-wrapper .table-scroll {
+  max-height: 220px !important;
+}
+
+/* Equalize heights and adjust widths to fit inline */
+.new-comparison-container {
+  flex-wrap: nowrap !important;
+}
+.comparison-visuals {
+  flex-wrap: nowrap !important;
+  gap: 24px !important;
+  max-width: 580px !important;
+}
+.federated-circle {
+  width: 220px !important;
+  height: 220px !important;
+  flex-shrink: 0 !important;
+}
+.hospital-pills {
+  height: 220px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  gap: 0 !important;
+  min-width: 220px !important;
+  max-width: 300px !important;
+}
+.hospital-pill {
+  padding: 8px 16px !important;
+  height: 64px !important;
+  border-radius: 32px !important;
+}
+.pill-icon {
+  width: 38px !important;
+  height: 38px !important;
+}
+
+/* Dashboard Icons and Headings */
+.heading-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.heading-icon {
+  width: 44px;
+  height: 44px;
+  background: #eefdf8;
+  color: #0d8375;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.heading-with-icon h2 {
+  margin: 0 !important;
+}
+.heading-with-icon p {
+  margin: 2px 0 0 0 !important;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.job-status-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  min-width: 280px;
+}
+.job-status-box strong {
+  display: block;
+  font-size: 14px;
+  color: #0f172a;
+}
+.job-status-box p {
+  margin: 0 !important;
+  font-size: 12px !important;
+  color: #64748b !important;
+}
+
+.metric-strip>div {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  padding: 24px !important;
+}
+.metric-icon {
+  width: 48px;
+  height: 48px;
+  background: #eefdf8;
+  color: #0d8375;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.metric-content {
+  display: flex;
+  flex-direction: column;
+}
+.metric-content span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.metric-content strong {
+  font-size: 32px;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
+.model-comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
