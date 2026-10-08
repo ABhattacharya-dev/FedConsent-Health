@@ -27,3 +27,11 @@ Resume checkpoint, 2026-10-08: prior integration is committed in 7347a9c and mai
 - DP accounting is cumulative within each run, conditional on public cohort/evaluation metadata. No composed guarantee across experiments/non-DP outputs; secure RNG off. Attack statistics are outside the DP training guarantee.
 - User feature testing is next. Further presentation preparation is deferred at the user request. No broader architecture, Docker, cloud, secure aggregation or additional attacks were added.
 - See docs/SUBMISSION.md for every judging category (provided weights total 90), pitch, Q&A and honest remaining limits. See docs/DEMO.md for the executable flow and backup plan.
+
+## Reference UI redesign — ready for review
+
+2026-10-08, branch `feature/reference-ui`: installed requested Impeccable and Anthropic skills, retaining the prior frontend skill. Replaced conflicting fixed-width CSS with responsive light surfaces, tinted hospital cards, pill controls, a dark privacy chart and redesigned patient consent states. Added AUROC/accuracy/F1 selection and hospital-to-consent shortcuts. Generated a decorative blue-teal sculpture. Preserved the user's existing hospital heading arrangement.
+
+Production build passes. User requested no automated tests; none run. Browser inspected desktop and 390px layout, metric switching and privacy view. Fixed previously broken packaged-server icon paths by bundling all referenced graphics under Vite assets. Existing privacy/cohort selection logic and backend untouched. Runtime uses the existing prepared demo database on localhost:8001; no experiments or consent mutations performed. Screenshots are in artifacts/submission/redesign-*.png. Existing Roboto retained intentionally; removed a layout animation flagged by the design detector. No merge or push; acceptance remains with the user.
+
+Final visual review resolved the phone navigation overlay and idle skip-link visibility. Reviewer scored both fixes resolved (ship for that fix list). Phone navigation now follows the header in document flow. No automated test suite was run.

@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T00:00:00+05:30",
+  "title": "Design System: FedConsent Health",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Research Blue", "canonical": "#0066d9", "tonalRamp": ["#00234b", "#00366f", "#004993", "#005cb7", "#0066d9", "#4389e5", "#84b1ee", "#c5dafa"] },
+      "teal": { "role": "secondary", "displayName": "Trust Teal", "canonical": "#08746c", "tonalRamp": ["#002823", "#003e38", "#00554e", "#086b64", "#08746c", "#3c918b", "#79b6b1", "#c0dfdc"] },
+      "canvas": { "role": "neutral", "displayName": "Paper Canvas", "canonical": "#f7f9fb", "tonalRamp": ["#20282f", "#3b4650", "#56636e", "#74818c", "#98a3ad", "#c0c8d0", "#e2e7eb", "#f7f9fb"] },
+      "blue-panel": { "role": "secondary", "displayName": "Cohort Blue", "canonical": "#edf5ff", "tonalRamp": ["#183b5e", "#28547c", "#39709c", "#568dbc", "#7aabda", "#a3c8ed", "#cce2f7", "#edf5ff"] },
+      "mint-panel": { "role": "secondary", "displayName": "Cohort Mint", "canonical": "#eef8f2", "tonalRamp": ["#1d4b32", "#316748", "#4a835f", "#69a079", "#8fbc99", "#b6d5bd", "#d8eadc", "#eef8f2"] },
+      "apricot-panel": { "role": "tertiary", "displayName": "Cohort Apricot", "canonical": "#fff5ec", "tonalRamp": ["#5b321d", "#78482b", "#97603a", "#b87a4d", "#d79b69", "#ebbd91", "#f6dcc0", "#fff5ec"] },
+      "privacy-panel": { "role": "neutral", "displayName": "Privacy Slate", "canonical": "#131b21", "tonalRamp": ["#131b21", "#26343d", "#3a4c58", "#526875", "#748994", "#9dafb8", "#c8d3d9", "#edf2f4"] },
+      "privacy-accent": { "role": "tertiary", "displayName": "Privacy Aqua", "canonical": "#67d8d0", "tonalRamp": ["#134a47", "#1d6964", "#298982", "#3ca9a1", "#67d8d0", "#8de4dd", "#b6eee9", "#e1faf7"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page Display", "purpose": "Page titles and only the most important measured values." },
+      "headline": { "displayName": "Section Headline", "purpose": "Major evidence blocks and section headings." },
+      "body": { "displayName": "Evidence Body", "purpose": "Explanatory text, capped at 75ch." },
+      "label": { "displayName": "Evidence Label", "purpose": "Fields, badges, captions, and secondary metadata." },
+      "mono": { "displayName": "Machine Evidence", "purpose": "Run IDs and preformatted evidence." }
+    },
+    "shadows": [
+      { "name": "selected-tab", "value": "0 2px 7px #273c4b12", "purpose": "Shows the active metric tab." },
+      { "name": "mobile-navigation", "value": "0 8px 30px #1f354726", "purpose": "Lifts the fixed bottom navigation from the canvas." }
+    ],
+    "motion": [
+      { "name": "control-state", "value": "background .16s ease, color .16s ease", "purpose": "Button state changes; all transitions are removed for reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1500px" },
+      { "name": "compact-desktop", "value": "1150px" },
+      { "name": "tablet", "value": "820px" },
+      { "name": "mobile", "value": "580px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Starts a consequential workspace action such as training.",
+      "html": "<button class=\"ds-btn-primary\">Start training</button>",
+      "css": ".ds-btn-primary { min-height: 44px; padding: 10px 18px; border: 1px solid #0066d9; border-radius: 24px; background: #0066d9; color: #fff; font: 500 15px Roboto, 'Segoe UI', sans-serif; cursor: pointer; transition: background .16s ease, color .16s ease; } .ds-btn-primary:hover { background: #0054b4; } .ds-btn-primary:focus-visible { outline: 3px solid #0074d9; outline-offset: 4px; } .ds-btn-primary:active { background: #dcecff; color: #273b4a; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Uses a quiet bordered surface for supporting actions.",
+      "html": "<button class=\"ds-btn-secondary\">Export evidence</button>",
+      "css": ".ds-btn-secondary { min-height: 44px; padding: 10px 18px; border: 1px solid #dbe3e9; border-radius: 24px; background: #fff; color: #273b4a; font: 500 15px Roboto, 'Segoe UI', sans-serif; cursor: pointer; transition: background .16s ease, color .16s ease; } .ds-btn-secondary:hover { background: #edf5ff; border-color: #99bddf; } .ds-btn-secondary:focus-visible { outline: 3px solid #0074d9; outline-offset: 4px; }"
+    },
+    {
+      "name": "Evidence Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Native control styling for experiment configuration and record selection.",
+      "html": "<label class=\"ds-field\">Privacy configuration<select><option>No DP · local + federated</option></select></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 7px; color: #1c2228; font: 500 12px Roboto, 'Segoe UI', sans-serif; } .ds-field select { min-height: 46px; padding: 9px 12px; border: 1px solid #9dacb8; border-radius: 12px; background: #f7f9fc; color: #243a4b; font: 400 15px Roboto, 'Segoe UI', sans-serif; } .ds-field select:focus-visible { outline: 3px solid #0074d9; outline-offset: 4px; }"
+    },
+    {
+      "name": "Cohort Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Shows a hospital cohort with a dedicated, non-evaluative tonal surface.",
+      "html": "<article class=\"ds-cohort\"><strong>Hospital A</strong><span>124 eligible</span><div class=\"ds-bar\"><i></i></div><small>Normal 73 · Pneumonia 51</small></article>",
+      "css": ".ds-cohort { display: grid; gap: 14px; padding: 24px; border-radius: 28px; background: #edf5ff; color: #163b62; font: 400 15px Roboto, 'Segoe UI', sans-serif; } .ds-cohort strong { font-size: 17px; } .ds-cohort span { font-size: 38px; font-weight: 500; letter-spacing: -.025em; } .ds-cohort small { font-size: 11px; } .ds-bar { height: 7px; overflow: hidden; border-radius: 8px; background: #b8cbdc; } .ds-bar i { display: block; width: 62%; height: 100%; border-radius: inherit; background: #397baf; }"
+    },
+    {
+      "name": "Metric Tabs",
+      "kind": "chip",
+      "refersTo": "metric-tabs",
+      "description": "Pill selector for AUROC, accuracy, and F1 comparisons.",
+      "html": "<div class=\"ds-tabs\"><button>AUROC</button><button class=\"ds-active\">Accuracy</button><button>F1</button></div>",
+      "css": ".ds-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 30px; background: #f0f4f8; } .ds-tabs button { min-height: 36px; padding: 7px 20px; border: 0; border-radius: 24px; background: transparent; color: #1c2228; font: 500 12px Roboto, 'Segoe UI', sans-serif; cursor: pointer; } .ds-tabs .ds-active { background: #fff; color: #005bbb; box-shadow: 0 2px 7px #273c4b12; } .ds-tabs button:focus-visible { outline: 3px solid #0074d9; outline-offset: 4px; }"
+    },
+    {
+      "name": "Mobile Pill Navigation",
+      "kind": "nav",
+      "refersTo": "mobile-navigation",
+      "description": "Fixed compact navigation used under the tablet breakpoint.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-active\">Research overview</button><button>Privacy</button><button>Patient</button></nav>",
+      "css": ".ds-nav { display: inline-flex; gap: 6px; padding: 6px; border: 1px solid #dbe5ec; border-radius: 40px; background: #fff; box-shadow: 0 8px 30px #1f354726; } .ds-nav button { min-height: 46px; padding: 10px 13px; border: 0; border-radius: 24px; background: transparent; color: #1c2228; font: 500 12px Roboto, 'Segoe UI', sans-serif; cursor: pointer; } .ds-nav .ds-active { background: #e7f1ff; color: #005bbb; } .ds-nav button:focus-visible { outline: 3px solid #0074d9; outline-offset: 4px; }"
+    },
+    {
+      "name": "Privacy Evidence Panel",
+      "kind": "custom",
+      "refersTo": "privacy-chart",
+      "description": "Dark evidence surface for measured privacy–utility tradeoffs.",
+      "html": "<section class=\"ds-privacy\"><h3>Measured privacy–utility tradeoff</h3><p>Comparable experiments only.</p><svg viewBox=\"0 0 240 80\" aria-label=\"Illustrative plot\"><path d=\"M12 66H228M12 12V66\"/><circle cx=\"112\" cy=\"38\" r=\"5\"/></svg></section>",
+      "css": ".ds-privacy { padding: 26px; border-radius: 24px; background: #131b21; color: #f5f9fc; font: 400 15px Roboto, 'Segoe UI', sans-serif; } .ds-privacy h3 { margin: 0 0 8px; font-size: 18px; } .ds-privacy p { margin: 0 0 16px; color: #b4c7d1; font-size: 12px; } .ds-privacy svg { width: 100%; } .ds-privacy path { stroke: #7d929d; fill: none; } .ds-privacy circle { fill: #67d8d0; stroke: #d1fffb; stroke-width: 2; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Inspectable Research Desk",
+    "overview": "The interface makes complex consent and privacy evidence feel like a calm, readable workspace. White surfaces and generous breathing room establish the baseline; cool blue, mint, and apricot separate the three hospital cohorts without turning their data into decoration. The blue-teal sculpture and the dark privacy chart are reserved evidence landmarks. They give the research view a recognizable focal point while measured values, consent status, and limitations stay in ordinary readable UI.",
+    "keyCharacteristics": ["Spacious white cards on a pale blue-grey canvas.", "Rounded controls and cohort-specific tonal panels.", "Blue for primary action, teal for consent-aware context, and a dark panel for privacy evidence."],
+    "rules": [
+      { "name": "The Cohort Separation Rule", "body": "Use blue, mint, and apricot to distinguish the three existing hospital cohorts; do not use them to imply performance or consent quality.", "section": "colors" },
+      { "name": "The Evidence First Rule", "body": "Large type belongs to measured values and page purpose; decorative type does not compete with research evidence.", "section": "typography" },
+      { "name": "The Space for Evidence Rule", "body": "Let dense tables scroll horizontally inside their own container; do not compress columns until values become hard to compare.", "section": "layout" },
+      { "name": "The Tonal Layer Rule", "body": "Prefer a white or tinted surface change over a shadow; elevation is reserved for floating or selected controls.", "section": "elevation" }
+    ],
+    "dos": ["Do keep controls native and expose clear keyboard focus.", "Do use the three cohort surfaces consistently for Hospital A, B, and C.", "Do reserve the dark privacy panel for privacy evidence and comparative measurement.", "Do use actual experiment, consent, and accountant values in visual summaries."],
+    "donts": ["Don't add extra display fonts or icon libraries; the shipped system uses Roboto, Consolas, and inline or bundled SVG assets.", "Don't rely on shadows to make ordinary cards feel layered.", "Don't turn cohort colors into a claim about hospital quality, privacy, or clinical outcome."]
+  }
+}

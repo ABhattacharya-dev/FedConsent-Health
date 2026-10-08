@@ -51,3 +51,14 @@ Moved frontend-design's `version`, `last_updated` and `tags`, and Docker's `comp
 Inspected entrypoints and bundled helper scripts. No new hooks or MCP connections were registered. Docker's helper builds an image and inspects its size/user; it was not executed. Frontend's contrast helper is a local calculation utility. Related skills referenced upstream are optional and were not installed; some Sentry language/infrastructure references are absent upstream in this selected package, while Python, JavaScript and Docker guides are present.
 
 The installer's external assessments were mixed for Sentry security-review (Gen: Critical Risk, Socket: 1 alert, Snyk: Low Risk); the summary did not give a cause. The package contains review documentation and illustrative vulnerable code, with no executable helper or hook. This inspection does not resolve the external alert. AGENTS.md explicitly overrides its exclusion of authenticated code paths: authenticated authorization/consent bypasses still require review. It also preserves SQLAlchemy over the FastAPI skill's SQLModel preference and keeps visual styling/Docker execution gated. Skill installation is not evidence of application security or DP correctness.
+
+## Reference UI skills (2026-10-08)
+
+Installed project-locally with the Codex skill-installer download helper:
+- Impeccable: https://github.com/pbakaus/impeccable, `.agents/skills/impeccable`, commit `778c8a7b71ccd5bfe3ca6ac68c15d9d872d0f87d`. Official source linked by https://impeccable.style/. Engine context launcher downloaded and verified its official release checksum. No hooks or external services configured.
+- Anthropic frontend-design: https://github.com/anthropics/skills/tree/main/skills/frontend-design, commit `683bc88e56f3e09ba94f7055977f3d3aa499f202`. Installed as `anthropic-frontend-design`; frontmatter name adjusted to avoid the existing practicalswan skill collision. License retained.
+
+Both entrypoints were read and used this session; restart Codex to refresh automatic skill discovery if needed.
+
+### Decorative asset
+`frontend/src/assets/research-sculpture.png` was generated with the built-in image generation tool. It is decoration, not evidence or a metric. Prompt: “Use case: stylized-concept. Create a refined abstract 3D sculpture for a medical research dashboard: a single spherical form built from fine vertical translucent glass fins, icy blue on the left blending into cyan and sea-green on the right. Soft pearlescent lighting, sculptural precision, serene and airy. Centered composition with ample margin, isolated on pure white background. No text, no logos, no symbols, no UI, no medical imagery. Square image. This is a decorative visual asset, not a data visualization.”

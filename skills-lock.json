@@ -19,6 +19,12 @@
       "skillPath": "frontend-design/SKILL.md",
       "computedHash": "d2de10b0939fdb8d22c276f90d3baba11a55bfc6ad26d564ac0f3014f919ed96"
     },
+    "pptx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pptx/SKILL.md",
+      "computedHash": "d6198c2f85d5d1c737d451b98ebacc3bbc187730c9a79252aa738ddb8d818455"
+    },
     "security-review": {
       "source": "getsentry/skills",
       "sourceType": "github",

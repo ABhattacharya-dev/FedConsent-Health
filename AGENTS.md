@@ -51,3 +51,8 @@ Read the applicable entrypoint; use the local copy instead of stacking equivalen
 - Use Docker after the core application works if reproducibility/demo value warrants it. Inspect bundled helper scripts before executing them; no container builds, pruning or deployment are part of skill installation. Add other third-party skills only with authorization.
 
 @RTK.md
+
+## Approved reference UI skills
+- Styling is authorized. `.agents/skills/impeccable/SKILL.md`: reference-led redesign, responsive layout, interaction and bounded visual review.
+- `.agents/skills/anthropic-frontend-design/SKILL.md`: deliberate typography, composition and visual identity. Installed with a distinct name to preserve the practicalswan frontend-design skill.
+- Apply one primary design workflow; preserve the privacy invariants above. User requests and supplied references override optional skill ceremony.
